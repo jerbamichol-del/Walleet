@@ -1,5 +1,6 @@
 {
-  "appId": "com.example.gestorespese",
-  "appName": "gestore-spese",
-  "webDir": "dist"
+  "appId": "com.jerbamichol.walleet",
+  "appName": "Walleet",
+  "webDir": "dist",
+  "bundledWebRuntime": false
 }
