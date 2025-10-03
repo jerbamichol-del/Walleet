@@ -20,6 +20,7 @@
     "@vitejs/plugin-react": "^4.7.0",
     "typescript": "^5.9.3",
     "vite": "^7.1.8",
+    "vite-plugin-pwa": "^1.0.3",
     "workbox-build": "7.0.0"
   }
 }
