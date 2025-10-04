@@ -4,12 +4,19 @@ android {
     namespace "com.example.gestorespese"
     compileSdk rootProject.ext.compileSdkVersion
 
+    // 🔹 Carica le proprietà del keystore
+    def keystorePropertiesFile = rootProject.file("keystore.properties")
+    def keystoreProperties = new Properties()
+    if (keystorePropertiesFile.exists()) {
+        keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+    }
+
     defaultConfig {
         applicationId "com.example.gestorespese"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
 
-        // 🔹 Aumenta questi valori per ogni nuova versione
+        // 🔹 Aggiorna questi due valori per ogni nuova versione
         versionCode 2
         versionName "1.1"
 
@@ -20,10 +27,23 @@ android {
         }
     }
 
+    signingConfigs {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                storeFile file(keystoreProperties["storeFile"])
+                storePassword keystoreProperties["storePassword"]
+                keyAlias keystoreProperties["keyAlias"]
+                keyPassword keystoreProperties["keyPassword"]
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // 🔹 Firma automatica per release
+            signingConfig signingConfigs.release
         }
     }
 
