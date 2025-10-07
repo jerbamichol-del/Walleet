@@ -22,18 +22,18 @@ jobs:
           node-version: 20
           cache: 'npm'
 
-      # 3️⃣ Setup Java 17 (compatibilità Gradle/Android)
+      # 3️⃣ Setup Java 21
       - name: Setup Java
         uses: actions/setup-java@v3
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 21
 
-      # 4️⃣ Install dependencies con legacy-peer-deps
+      # 4️⃣ Install dependencies
       - name: Install npm dependencies
         run: npm install --legacy-peer-deps
 
-      # 5️⃣ Installa Capacitor Android e plugin Speech Recognition
+      # 5️⃣ Install Capacitor Android & Speech Recognition
       - name: Install Capacitor Android & Plugins
         run: |
           npm install @capacitor/android --legacy-peer-deps
@@ -43,26 +43,28 @@ jobs:
       - name: Build project
         run: npm run build
 
-      # 7️⃣ Aggiungi o sincronizza Android (crea piattaforma se non esiste)
+      # 7️⃣ Add or Sync Android
       - name: Add or Sync Android
         run: |
           npx cap add android || npx cap sync android
 
-      # 8️⃣ Controllo permessi microfono
-      # Percorso locale: android/app/src/main/AndroidManifest.xml
-      # Deve contenere dentro <manifest>:
-      # <uses-permission android:name="android.permission.RECORD_AUDIO" />
-      # Puoi aggiungerlo manualmente prima del push, oppure assicurarti che sia già presente nel repo
+      # 8️⃣ Aggiorna Manifest (permesso microfono senza duplicati)
+      - name: Update AndroidManifest
+        run: |
+          MANIFEST_PATH=android/app/src/main/AndroidManifest.xml
+          grep -q "android.permission.RECORD_AUDIO" $MANIFEST_PATH || \
+          sed -i '/<uses-permission android:name="android.permission.INTERNET" \/>/a \
+          <uses-permission android:name="android.permission.RECORD_AUDIO" />' $MANIFEST_PATH
 
-      # 9️⃣ Build APK
-      - name: Build Android APK
+      # 9️⃣ Build Android APK
+      - name: Build Android app
         run: |
           cd android
-          ./gradlew assembleDebug
+          ./gradlew clean assembleDebug
 
-      # 🔟 Upload artifact (APK debug)
+      # 🔟 Upload artifacts
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: android-debug-apk
+          name: android-build
           path: android/app/build/outputs/apk/debug/*.apk
