@@ -11,58 +11,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
 
-      # 3️⃣ Setup Java 21
       - name: Setup Java
         uses: actions/setup-java@v3
         with:
           distribution: temurin
-          java-version: 21
+          java-version: 17
 
-      # 4️⃣ Install dependencies
-      - name: Install npm dependencies
+      - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      # 5️⃣ Install Capacitor Android & Speech Recognition
-      - name: Install Capacitor Android & Plugins
-        run: |
-          npm install @capacitor/android --legacy-peer-deps
-          npm install @capacitor-community/speech-recognition --legacy-peer-deps
-
-      # 6️⃣ Build progetto web
       - name: Build project
         run: npm run build
 
-      # 7️⃣ Add or Sync Android
       - name: Add or Sync Android
         run: |
           npx cap add android || npx cap sync android
 
-      # 8️⃣ Aggiorna Manifest (permesso microfono senza duplicati)
-      - name: Update AndroidManifest
-        run: |
-          MANIFEST_PATH=android/app/src/main/AndroidManifest.xml
-          grep -q "android.permission.RECORD_AUDIO" $MANIFEST_PATH || \
-          sed -i '/<uses-permission android:name="android.permission.INTERNET" \/>/a \
-          <uses-permission android:name="android.permission.RECORD_AUDIO" />' $MANIFEST_PATH
-
-      # 9️⃣ Build Android APK
-      - name: Build Android app
+      - name: Build Android APK
         run: |
           cd android
           ./gradlew clean assembleDebug
 
-      # 🔟 Upload artifacts
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
