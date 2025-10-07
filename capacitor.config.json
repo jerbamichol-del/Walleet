@@ -1,6 +1,6 @@
 {
   "appId": "com.example.gestorespese",
   "appName": "Walleet",
-  "webDir": "dist",
+  "webDir": "www",
   "bundledWebRuntime": false
 }
