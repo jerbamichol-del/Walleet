@@ -1,0 +1,68 @@
+name: Build Capacitor Android App
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2️⃣ Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      # 3️⃣ Setup Java 17
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # 4️⃣ Install dependencies
+      - name: Install npm dependencies
+        run: npm install --legacy-peer-deps
+
+      # 5️⃣ Install Capacitor Android and plugins
+      - name: Install Capacitor Android & Plugins
+        run: |
+          npm install @capacitor/android --legacy-peer-deps
+          npm install @capacitor-community/speech-recognition --legacy-peer-deps
+
+      # 6️⃣ Build web project
+      - name: Build web project
+        run: npm run build
+
+      # 7️⃣ Add or sync Android platform
+      - name: Add or Sync Android
+        run: npx cap add android || npx cap sync android
+
+      # 8️⃣ Configure AndroidManifest.xml with Microphone Permission
+      # Percorso: android/app/src/main/AndroidManifest.xml
+      - name: Add Microphone Permission
+        run: |
+          sed -i '/<uses-permission android:name="android.permission.INTERNET" \/>/a \
+          <uses-permission android:name="android.permission.RECORD_AUDIO" />' android/app/src/main/AndroidManifest.xml
+
+      # 9️⃣ Build Android APK
+      - name: Build Android APK
+        run: |
+          cd android
+          ./gradlew clean assembleDebug
+
+      # 🔟 Upload APK as artifact
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
