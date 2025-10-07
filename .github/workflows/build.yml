@@ -1,4 +1,4 @@
-name: Build Capacitor App
+name: Build Capacitor Android App
 
 on:
   push:
@@ -20,25 +20,31 @@ jobs:
           node-version: 20
           cache: 'npm'
 
-      - name: Install project dependencies
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install npm dependencies
         run: npm install --legacy-peer-deps
 
-      - name: Install Capacitor Android
-        run: npm install @capacitor/android --legacy-peer-deps
-
-      - name: Install Speech Recognition plugin
-        run: npm install @capacitor-community/speech-recognition --legacy-peer-deps
+      - name: Install Capacitor Android & Speech Plugin
+        run: |
+          npm install @capacitor/android --legacy-peer-deps
+          npm install @capacitor-community/speech-recognition --legacy-peer-deps
 
       - name: Build project
         run: npm run build
 
-      - name: Sync Capacitor
-        run: npx cap sync android
+      - name: Add or Sync Android Platform
+        run: |
+          npx cap add android || npx cap sync android
 
       - name: Build Android app
         run: |
           cd android
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleDebug
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
