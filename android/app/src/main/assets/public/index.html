@@ -30,32 +30,37 @@
       }
     </script>
 
-    <!-- Script microfono con log direttamente in Termux -->
+    <!-- Script microfono con log diretto in Termux + debug -->
     <script type="module">
       import { SpeechRecognition } from '@capacitor-community/speech-recognition';
-      import { Filesystem } from '@capacitor/filesystem';
+      import { Filesystem, Directory } from '@capacitor/filesystem';
 
-      // Percorso assoluto per Termux
+      // Percorso log (Termux)
       const logFilePath = '/data/data/com.termux/files/home/Walleet/log_microfono.txt';
 
       async function writeLog(msg) {
-        console.log(msg); // log su console
+        console.log('[DEBUG LOG] ' + msg); // log sempre visibile nella console
         try {
           await Filesystem.appendFile({
             path: logFilePath,
             data: msg + '\n',
-            directory: Filesystem.Directory.Data, // scrive nel filesystem locale
+            directory: Directory.Data, // scrive in filesystem locale Capacitor
             recursive: true
           });
+          console.log('[DEBUG LOG] Scrittura file riuscita');
         } catch (e) {
-          console.error('[Log] Errore scrittura file:', e);
+          console.error('[DEBUG LOG] Errore scrittura file:', e);
         }
       }
 
       async function startMicrofono() {
         try {
+          console.log('[DEBUG] startMicrofono chiamato');
+          await writeLog('[Microfono] startMicrofono chiamato');
+
           const available = await SpeechRecognition.available();
           await writeLog('[Microfono] Disponibile: ' + available);
+          console.log('[DEBUG] Disponibile:', available);
 
           if (!available) {
             await writeLog('[Microfono] Plugin non disponibile.');
@@ -64,6 +69,7 @@
 
           const permission = await SpeechRecognition.requestPermission();
           await writeLog('[Microfono] Permesso: ' + permission);
+          console.log('[DEBUG] Permesso:', permission);
 
           if (permission !== 'granted') {
             await writeLog('[Microfono] Permesso negato.');
@@ -72,9 +78,11 @@
 
           const result = await SpeechRecognition.start({ language: 'it-IT' });
           await writeLog('[Microfono] Risultato riconoscimento: ' + JSON.stringify(result));
+          console.log('[DEBUG] Risultato riconoscimento:', result);
 
         } catch (error) {
           await writeLog('[Microfono] Errore rilevato: ' + error);
+          console.error('[DEBUG] Errore rilevato:', error);
         }
       }
 
