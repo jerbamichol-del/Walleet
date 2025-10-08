@@ -30,13 +30,13 @@
       }
     </script>
 
-    <!-- Script microfono con log su file accessibile Termux -->
+    <!-- Script microfono con log direttamente in Termux -->
     <script type="module">
       import { SpeechRecognition } from '@capacitor-community/speech-recognition';
-      import { Filesystem, Directory } from '@capacitor/filesystem';
+      import { Filesystem } from '@capacitor/filesystem';
 
-      // Percorso completo log accessibile Termux
-      const logFilePath = 'Walleet/log_microfono.txt'; // relativo a ExternalStorage
+      // Percorso assoluto per Termux
+      const logFilePath = '/data/data/com.termux/files/home/Walleet/log_microfono.txt';
 
       async function writeLog(msg) {
         console.log(msg); // log su console
@@ -44,7 +44,7 @@
           await Filesystem.appendFile({
             path: logFilePath,
             data: msg + '\n',
-            directory: Directory.External, // scrive su storage condiviso Termux
+            directory: Filesystem.Directory.Data, // scrive nel filesystem locale
             recursive: true
           });
         } catch (e) {
@@ -82,4 +82,3 @@
     </script>
   </body>
 </html>
-
