@@ -6,6 +6,8 @@ import android.content.pm.PackageManager;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import android.webkit.WebView; // <<-- abilitare debug WebView
+
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.community.speechrecognition.SpeechRecognition;
 
@@ -16,6 +18,10 @@ public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // Abilita WebView remote debugging (console.log -> logcat)
+        WebView.setWebContentsDebuggingEnabled(true);
+        System.out.println("MainActivity: WebView debugging abilitato");
 
         // Registra il plugin SpeechRecognition per Capacitor
         registerPlugin(SpeechRecognition.class);
