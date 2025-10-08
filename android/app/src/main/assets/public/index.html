@@ -11,6 +11,15 @@
   </head>
   <body class="bg-slate-100">
     <div id="root"></div>
+
+    <!-- Pulsante per test microfono -->
+    <div class="p-4">
+      <button onclick="startMicrofono()" class="bg-blue-600 text-white px-4 py-2 rounded">
+        Avvia Microfono
+      </button>
+    </div>
+
+    <!-- Service Worker -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
@@ -19,6 +28,56 @@
             .catch(err => console.error('SW registration failed:', err));
         });
       }
+    </script>
+
+    <!-- Script microfono con log su file -->
+    <script type="module">
+      import { SpeechRecognition } from '@capacitor-community/speech-recognition';
+      import { Filesystem, Directory } from '@capacitor/filesystem';
+
+      const logFilePath = 'log_microfono.txt'; // file nella directory dati dell'app
+
+      async function writeLog(msg) {
+        console.log(msg); // log su console
+        try {
+          await Filesystem.appendFile({
+            path: logFilePath,
+            data: msg + '\n',
+            directory: Directory.Data
+          });
+        } catch (e) {
+          console.error('[Log] Errore scrittura file:', e);
+        }
+      }
+
+      async function startMicrofono() {
+        try {
+          const available = await SpeechRecognition.available();
+          await writeLog('[Microfono] Disponibile: ' + available);
+
+          if (!available) {
+            await writeLog('[Microfono] Plugin non disponibile.');
+            return;
+          }
+
+          const permission = await SpeechRecognition.requestPermission();
+          await writeLog('[Microfono] Permesso: ' + permission);
+
+          if (permission !== 'granted') {
+            await writeLog('[Microfono] Permesso negato.');
+            return;
+          }
+
+          const result = await SpeechRecognition.start({ language: 'it-IT' });
+          await writeLog('[Microfono] Risultato riconoscimento: ' + JSON.stringify(result));
+
+        } catch (error) {
+          await writeLog('[Microfono] Errore rilevato: ' + error);
+        }
+      }
+
+      // Rende la funzione globale per il pulsante
+      window.startMicrofono = startMicrofono;
     </script>
   </body>
 </html>
