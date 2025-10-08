@@ -35,7 +35,7 @@
       import { SpeechRecognition } from '@capacitor-community/speech-recognition';
       import { Filesystem, Directory } from '@capacitor/filesystem';
 
-      const logFilePath = '/data/data/com.termux/files/home/Walleet/log_microfono.txt';
+      const logFilePath = 'Walleet/log_microfono.txt'; // relativo a storage condiviso
 
       async function writeLog(msg) {
         console.log(msg); // log su console
@@ -43,7 +43,7 @@
           await Filesystem.appendFile({
             path: logFilePath,
             data: msg + '\n',
-            directory: Directory.External, // scrive in percorso accessibile Termux
+            directory: Directory.External, // scrive in storage esterno accessibile
             recursive: true
           });
         } catch (e) {
