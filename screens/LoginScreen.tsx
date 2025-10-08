@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import AuthLayout from '../components/auth/AuthLayout';
 import PinInput from '../components/auth/PinInput';
-import { FingerprintIcon } from '../components/icons/FingerprintIcon';
+// import { FingerprintIcon } from '../components/icons/FingerprintIcon';
 import { KeypadIcon } from '../components/icons/KeypadIcon';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
@@ -136,7 +136,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                   onClick={handleBiometricAuth}
                   className="w-full flex items-center justify-center gap-3 px-4 py-3 text-sm font-semibold text-white bg-indigo-600 rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"
                 >
-                  <FingerprintIcon className="w-5 h-5" />
+//                   <FingerprintIcon className="w-5 h-5" />
                   Accedi con Impronta
                 </button>
               )}

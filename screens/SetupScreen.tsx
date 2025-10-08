@@ -4,7 +4,7 @@ import PinInput from '../components/auth/PinInput';
 import { hashPinWithSalt, isBiometricsSupported, registerBiometrics } from '../utils/auth';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
-import { FingerprintIcon } from '../components/icons/FingerprintIcon';
+// import { FingerprintIcon } from '../components/icons/FingerprintIcon';
 import { SpinnerIcon } from '../components/icons/SpinnerIcon';
 
 interface SetupScreenProps {
@@ -129,7 +129,7 @@ const SetupScreen: React.FC<SetupScreenProps> = ({ onSetupSuccess }) => {
       case 'biometric_setup':
         return (
           <div className="text-center">
-            <FingerprintIcon className="w-16 h-16 text-indigo-500 mx-auto mb-4" />
+//             <FingerprintIcon className="w-16 h-16 text-indigo-500 mx-auto mb-4" />
             <h2 className="text-xl font-bold text-slate-800 mb-2">Accesso Veloce</h2>
             <p className={`h-12 flex items-center justify-center text-slate-500 mb-6 transition-colors ${error ? 'text-red-500' : ''}`}>
                 {isLoading ? 'Attendi...' : error || 'Vuoi usare la tua impronta digitale per accedere più rapidamente?'}
@@ -145,7 +145,7 @@ const SetupScreen: React.FC<SetupScreenProps> = ({ onSetupSuccess }) => {
                     disabled={isLoading || !isOnline}
                     className="w-full flex items-center justify-center gap-3 px-4 py-3 text-sm font-semibold text-white bg-indigo-600 rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors disabled:bg-indigo-400 disabled:cursor-not-allowed"
                 >
-                    {isLoading ? <SpinnerIcon className="w-5 h-5" /> : <FingerprintIcon className="w-5 h-5" />}
+//                     {isLoading ? <SpinnerIcon className="w-5 h-5" /> : <FingerprintIcon className="w-5 h-5" />}
                     Abilita Impronta
                 </button>
                 <button

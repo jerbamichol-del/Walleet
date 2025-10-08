@@ -9,5 +9,7 @@ if (!rootElement) {
 
 const root = ReactDOM.createRoot(rootElement);
 root.render(
-  <AuthGate />
+  <React.StrictMode>
+    <AuthGate />
+  </React.StrictMode>
 );

@@ -4,24 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Gestore Spese - Nuovo Inizio</title>
-    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Manifest e CSS con percorsi relativi -->
+    <link rel="manifest" href="./manifest.json" />
+    <link rel="stylesheet" href="./index.css" />
+
     <meta name="theme-color" content="#4f46e5" />
     <script src="https://cdn.tailwindcss.com"></script>
-    <script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@18.3.1",
-    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
-    "react/": "https://esm.sh/react@18.3.1/",
-    "react-dom/": "https://esm.sh/react-dom@18.3.1/",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.21.0",
-    "recharts": "https://esm.sh/recharts@2.12.7",
-    "idb": "https://cdn.jsdelivr.net/npm/idb@8/+esm"
-  }
-}
-</script>
+
     <style>
-      /* Fix for browser autofill background color */
+      /* Fix per background autofill */
       input:-webkit-autofill,
       input:-webkit-autofill:hover,
       input:-webkit-autofill:focus,
@@ -29,6 +21,7 @@
           -webkit-box-shadow: 0 0 0 30px white inset !important;
           -webkit-text-fill-color: #0f172a !important; /* slate-900 */
       }
+
       @keyframes fade-in-up {
         from {
           opacity: 0;
@@ -43,30 +36,36 @@
       .animate-fade-in-up {
         animation: fade-in-up 0.5s ease-out forwards;
       }
-      
-      /* Definitive fix for Pie Chart focus outline */
+
+      /* Rimuove il focus outline dai grafici Recharts */
       .recharts-pie-sector path:focus,
       .recharts-pie-sector path:focus-visible {
         outline: none !important;
       }
     </style>
-  <link rel="stylesheet" href="/index.css">
-</head>
+  </head>
+
   <body class="bg-slate-100">
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
+
+    <!-- Ingresso principale React -->
+    <script type="module" src="./index.tsx"></script>
+
+    <!-- Service Worker (solo se necessario) -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/service-worker.js')
+          navigator.serviceWorker
+            .register('./service-worker.js')
             .then(registration => {
-              console.log('ServiceWorker registration successful with scope: ', registration.scope);
+              console.log('ServiceWorker registrato con successo:', registration.scope);
             })
             .catch(err => {
-              console.log('ServiceWorker registration failed: ', err);
+              console.log('Registrazione ServiceWorker fallita:', err);
             });
         });
       }
     </script>
   </body>
 </html>
+
