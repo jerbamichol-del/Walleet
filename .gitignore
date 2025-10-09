@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+# Output web Vite
+/www/
+/www/*
+
+# Asset generati da Capacitor
+/android/app/src/main/assets/public/
+/android/app/src/main/assets/public/*

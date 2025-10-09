@@ -1,71 +1,12 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="it">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Gestore Spese - Nuovo Inizio</title>
-
-    <!-- Manifest e CSS con percorsi relativi -->
-    <link rel="manifest" href="./manifest.json" />
-    <link rel="stylesheet" href="./index.css" />
-
-    <meta name="theme-color" content="#4f46e5" />
-    <script src="https://cdn.tailwindcss.com"></script>
-
-    <style>
-      /* Fix per background autofill */
-      input:-webkit-autofill,
-      input:-webkit-autofill:hover,
-      input:-webkit-autofill:focus,
-      input:-webkit-autofill:active {
-          -webkit-box-shadow: 0 0 0 30px white inset !important;
-          -webkit-text-fill-color: #0f172a !important; /* slate-900 */
-      }
-
-      @keyframes fade-in-up {
-        from {
-          opacity: 0;
-          transform: translateY(20px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-
-      .animate-fade-in-up {
-        animation: fade-in-up 0.5s ease-out forwards;
-      }
-
-      /* Rimuove il focus outline dai grafici Recharts */
-      .recharts-pie-sector path:focus,
-      .recharts-pie-sector path:focus-visible {
-        outline: none !important;
-      }
-    </style>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Walleet</title>
   </head>
-
-  <body class="bg-slate-100">
+  <body>
     <div id="root"></div>
-
-    <!-- Ingresso principale React -->
-    <script type="module" src="./index.tsx"></script>
-
-    <!-- Service Worker (solo se necessario) -->
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker
-            .register('./service-worker.js')
-            .then(registration => {
-              console.log('ServiceWorker registrato con successo:', registration.scope);
-            })
-            .catch(err => {
-              console.log('Registrazione ServiceWorker fallita:', err);
-            });
-        });
-      }
-    </script>
+    <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
-

@@ -17,7 +17,7 @@ export default defineConfig({
     open: false,
   },
   build: {
-    outDir: 'dist',
+    outDir: 'www', // allineato a capacitor.config.json (webDir: "www")
     emptyOutDir: true,
     rollupOptions: {
       input: path.resolve(__dirname, 'index.html'),
