@@ -43,6 +43,13 @@ jobs:
       - name: Build web project
         run: npm run build
 
+      # ✅ 6.5️⃣ Copia file build web dentro www
+      - name: Copy build output to www
+        run: |
+          rm -rf www
+          mkdir www
+          cp -r dist/* www/
+
       # 7️⃣ Add or sync Android platform
       - name: Add or Sync Android
         run: npx cap add android || npx cap sync android
@@ -66,3 +73,4 @@ jobs:
         with:
           name: android-debug-apk
           path: android/app/build/outputs/apk/debug/*.apk
+
