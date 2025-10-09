@@ -1,0 +1,53 @@
+name: Build Capacitor Android App
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Setup Java 21 (required by project)
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install npm dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Install Capacitor Android & Plugins
+        run: |
+          npm install @capacitor/android --legacy-peer-deps
+          npm install @capacitor-community/speech-recognition --legacy-peer-deps || true
+
+      - name: Build web
+        run: npm run build
+
+      - name: Add or Sync Android
+        run: |
+          npx cap add android || npx cap sync android
+
+      - name: Build Android APK
+        run: |
+          cd android
+          ./gradlew clean assembleDebug
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-build
+          path: android/app/build/outputs/apk/debug/*.apk
