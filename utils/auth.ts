@@ -19,7 +19,6 @@ const arrayBufferToB64 = (buffer: ArrayBuffer): string => {
     return window.btoa(binary);
 };
 
-
 // --- PIN Hashing (PBKDF2) ---
 export async function hashPinWithSalt(pin: string, salt?: ArrayBuffer): Promise<{ hash: string, salt: string }> {
     const saltBuffer = salt || crypto.getRandomValues(new Uint8Array(16));
@@ -58,32 +57,4 @@ export async function verifyPin(pin: string, storedHash: string, storedSalt: str
         console.error("PIN verification failed", e);
         return false;
     }
-}
-
-
-// --- SIMULATED WebAuthn ---
-
-export async function isBiometricsSupported(): Promise<boolean> {
-    // In an iframe environment that blocks WebAuthn, a real check might fail.
-    // We will simulate it as available, and the simulation will work regardless.
-    return true;
-}
-
-export async function registerBiometrics(): Promise<void> {
-    // Since the real API is blocked by the environment, we simulate a successful registration.
-    // We remove the window.confirm dialog to prevent the "user cancelled" error path,
-    // as the user's intent is already clear from clicking the "Enable" button.
-    return Promise.resolve();
-}
-
-export async function authenticateBiometrics(): Promise<boolean> {
-     // Simulate a successful authentication without a confusing confirmation dialog.
-    // The user's intent is clear from clicking the "Login with fingerprint" button.
-    return Promise.resolve(true);
-}
-
-export async function resetBiometrics(): Promise<void> {
-    // Since we are not storing credentials in IndexedDB anymore, this function is just a placeholder
-    // for compatibility with the reset button logic. It doesn't need to do anything.
-    return Promise.resolve();
 }

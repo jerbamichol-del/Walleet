@@ -56,14 +56,18 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         return (
           <div className="text-center">
             <h2 className="text-xl font-bold text-slate-800 mb-2">Accedi</h2>
-            <p className={`h-10 flex items-center justify-center transition-colors ${error ? 'text-red-500' : 'text-slate-500'}`}>
-              {isLoading ? 'Verifica in corso...' : (error || 'Inserisci il tuo PIN di 4 cifre.')}
+            <p
+              className={`h-10 flex items-center justify-center transition-colors ${
+                error ? 'text-red-500' : 'text-slate-500'
+              }`}
+            >
+              {isLoading ? 'Verifica in corso...' : error || 'Inserisci il tuo PIN di 4 cifre.'}
             </p>
             <PinInput pin={pin} onPinChange={setPin} />
 
             <button
-              onClick={() => setView('pin')}
-              className="mt-6 w-full flex items-center justify-center gap-3 px-4 py-3 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg shadow-sm hover:bg-slate-50"
+              onClick={handlePinVerify}
+              className="mt-6 w-full flex items-center justify-center gap-3 px-4 py-3 text-sm font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition"
             >
               <KeypadIcon className="w-5 h-5" />
               Accedi con PIN
