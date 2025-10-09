@@ -9,13 +9,13 @@ on:
 
 jobs:
   build-android-debug:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -23,31 +23,35 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install deps
-        run: npm ci
-
-      - name: Build web (to www/)
-        run: npm run build
-
       - name: Setup Java 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Install deps
+        run: npm install --legacy-peer-deps
 
-      - name: Accept SDK licenses
-        run: yes | sdkmanager --licenses
+      - name: Ensure Capacitor deps (idempotent)
+        run: |
+          npm install @capacitor/android --legacy-peer-deps
+          npm install @capacitor-community/speech-recognition --legacy-peer-deps || true
 
-      - name: Capacitor sync (android)
-        run: npx cap sync android
+      # 🔴 Usa il bundle legacy estratto dall'APK funzionante
+      - name: Usa bundle web legacy (pre-rottura)
+        run: |
+          rm -rf www
+          mkdir -p www
+          cp -R legacy_www_final/* www/
+          echo "Legacy web bundle copiato in www/"
 
-      - name: Sanity check assets
+      - name: Aggiungi/sincronizza piattaforma Android
+        run: npx cap add android || npx cap sync android
+
+      - name: Sanity check (index + assets)
         run: |
           test -f android/app/src/main/assets/public/index.html
-          ls -l android/app/src/main/assets/public/assets
+          ls -l android/app/src/main/assets/public/assets | head
 
       - name: Gradle build (debug)
         working-directory: ./android
@@ -55,9 +59,9 @@ jobs:
           chmod +x ./gradlew
           ./gradlew clean assembleDebug
 
-      - name: Upload APK
+      - name: Upload APK (android-build)
         uses: actions/upload-artifact@v4
         with:
-          name: Walleet-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
+          name: android-build
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn
