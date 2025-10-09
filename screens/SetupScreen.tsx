@@ -39,20 +39,27 @@ const SetupScreen: React.FC<SetupScreenProps> = ({ onSetupComplete }) => {
     <AuthLayout>
       <div className="text-center">
         <h2 className="text-xl font-bold text-slate-800 mb-4">Imposta il tuo PIN</h2>
-        <p className={`h-10 flex items-center justify-center text-sm text-red-500 ${error ? 'visible' : 'invisible'}`}>
+        <p
+          className={`h-10 flex items-center justify-center text-sm text-red-500 ${
+            error ? 'visible' : 'invisible'
+          }`}
+        >
           {error || ' '}
         </p>
+
         <div className="mb-4">
           <h3 className="text-sm font-medium text-slate-700 mb-1">PIN</h3>
           <PinInput pin={pin} onPinChange={setPin} />
         </div>
+
         <div className="mb-6">
           <h3 className="text-sm font-medium text-slate-700 mb-1">Conferma PIN</h3>
           <PinInput pin={pinConfirm} onPinChange={setPinConfirm} />
         </div>
+
         <button
           onClick={handleSavePin}
-          className="w-full px-4 py-3 text-sm font-semibold text-white bg-indigo-600 rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"
+          className="w-full px-4 py-3 text-sm font-semibold text-white bg-indigo-600 rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
         >
           Salva PIN
         </button>
@@ -62,3 +69,4 @@ const SetupScreen: React.FC<SetupScreenProps> = ({ onSetupComplete }) => {
 };
 
 export default SetupScreen;
+
