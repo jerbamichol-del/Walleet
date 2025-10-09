@@ -41,18 +41,22 @@ jobs:
           npm install @capacitor/android --legacy-peer-deps
           npm install @capacitor-community/speech-recognition --legacy-peer-deps || true
 
-      # === Firma debug STABILE (usa il secret creato prima) ===
+      # === Keystore debug STABILE: se il secret c'è, lo installa; altrimenti salta con messaggio ===
       - name: Install stable debug keystore
-        if: ${{ secrets.ANDROID_DEBUG_KEYSTORE_B64 != '' }}
         env:
           ANDROID_DEBUG_KEYSTORE_B64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_B64 }}
+        shell: bash
         run: |
-          mkdir -p ~/.android
-          echo "$ANDROID_DEBUG_KEYSTORE_B64" | base64 -d > ~/.android/debug.keystore
-          chmod 600 ~/.android/debug.keystore
-          echo "Installed stable debug keystore at ~/.android/debug.keystore"
+          if [[ -n "$ANDROID_DEBUG_KEYSTORE_B64" ]]; then
+            mkdir -p ~/.android
+            echo "$ANDROID_DEBUG_KEYSTORE_B64" | base64 -d > ~/.android/debug.keystore
+            chmod 600 ~/.android/debug.keystore
+            echo "Installed stable debug keystore at ~/.android/debug.keystore"
+          else
+            echo "Secret ANDROID_DEBUG_KEYSTORE_B64 not set; using default debug keystore."
+          fi
 
-      # === Versioning AUTO: ogni run aumenta il versionCode e aggiorna versionName ===
+      # === Versioning AUTO: ogni run aumenta versionCode e aggiorna versionName ===
       - name: Compute version code/name
         shell: bash
         run: |
@@ -67,13 +71,12 @@ jobs:
           echo "Computed VERSION_NAME=$VERSION_NAME"
 
       # === Prepara gli asset web per Capacitor ===
-      # Se esiste legacy_www_final/index.html usa il bundle "buono" estratto dall'APK;
-      # altrimenti builda con Vite e copia dist/ -> www/
+      # Se c'è legacy_www_final/index.html usa il bundle buono; altrimenti builda con Vite
       - name: Prepare web assets (legacy or build)
         shell: bash
         run: |
           rm -rf www
-          if [ -f legacy_www_final/index.html ]; then
+          if [[ -f legacy_www_final/index.html ]]; then
             echo "Using legacy_www_final as webDir"
             mkdir -p www
             cp -R legacy_www_final/* www/
