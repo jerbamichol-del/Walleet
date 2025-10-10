@@ -1,10 +1,9 @@
 #!/data/data/com.termux/files/usr/bin/bash
 set -Eeuo pipefail
 
-# === Resolve real script path (handles symlink in ~/bin) ===
-script_path="$(readlink -f "${BASH_SOURCE[0]}")"
-SCRIPT_DIR="$(cd "$(dirname "$script_path")" && pwd)"
-ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# === Paths & log ===
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"           # es. ~/Walleet
 cd "$ROOT"
 
 SNAP_DIR="$ROOT/_snapshots"
@@ -21,13 +20,15 @@ echo "Data: $(date +%d-%m-%Y_%H-%M-%S)"
 echo "Descrizione: report wstatus"
 
 # === GIT ===
-echo; echo "### GIT"
+echo
+echo "### GIT"
 git -C "$ROOT" status || true
 git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || true
 git -C "$ROOT" remote -v 2>/dev/null || true
 
 # === TOOLCHAIN ===
-echo; echo "### TOOLCHAIN"
+echo
+echo "### TOOLCHAIN"
 for cmd in node npm pnpm yarn npx java javac gradle ./gradlew; do
   if command -v $cmd >/dev/null 2>&1; then
     printf "%-10s: " "$cmd"
@@ -36,7 +37,8 @@ for cmd in node npm pnpm yarn npx java javac gradle ./gradlew; do
 done
 
 # === package.json / Vite ===
-echo; echo "### package.json (name, scripts, deps)"
+echo
+echo "### package.json (name, scripts, deps)"
 if [ -f "$ROOT/package.json" ]; then
   node -e 'try{const p=require("./package.json"); console.log("name:",p.name||""); console.log("scripts:",JSON.stringify(p.scripts||{},null,2)); console.log("dependencies:",Object.keys(p.dependencies||{}).sort().join(", ")); console.log("devDependencies:",Object.keys(p.devDependencies||{}).sort().join(", "));}catch(e){process.exit(1)}' 2>/dev/null \
   || sed -n '1,160p' "$ROOT/package.json"
@@ -44,34 +46,40 @@ else
   echo "package.json non trovato"
 fi
 
-echo; echo "### Vite config"
+echo
+echo "### Vite config"
 [ -f "$ROOT/vite.config.js" ] && { echo "-- vite.config.js"; sed -n '1,200p' "$ROOT/vite.config.js"; }
 [ -f "$ROOT/vite.config.ts" ] && { echo "-- vite.config.ts"; sed -n '1,200p' "$ROOT/vite.config.ts"; }
 [ -f "$ROOT/index.html" ] && { echo "-- index.html (head)"; sed -n '1,80p' "$ROOT/index.html"; }
 
 # === Capacitor ===
-echo; echo "### Capacitor config"
+echo
+echo "### Capacitor config"
 for f in "$ROOT/capacitor.config.ts" "$ROOT/capacitor.config.json" "$ROOT/capacitor.config.js"; do
   [ -f "$f" ] && { echo "-- $f"; sed -n '1,160p' "$f"; }
 done
 if command -v npx >/dev/null 2>&1; then
-  echo; echo "### npx cap ls"
+  echo
+  echo "### npx cap ls"
   npx cap ls 2>/dev/null || true
 fi
 
 # === Android (Gradle) ===
-echo; echo "### android/app/build.gradle (applicationId & SDK)"
+echo
+echo "### android/app/build.gradle (applicationId & SDK)"
 if [ -f "$ROOT/android/app/build.gradle" ]; then
   grep -nE 'applicationId|compileSdk|targetSdk|minSdk' "$ROOT/android/app/build.gradle" || sed -n '1,160p' "$ROOT/android/app/build.gradle"
 fi
 
-echo; echo "### AndroidManifest sorgente"
+echo
+echo "### AndroidManifest sorgente"
 SRCMF="$ROOT/android/app/src/main/AndroidManifest.xml"
 if [ -f "$SRCMF" ]; then
   grep -nE 'package=|provider|authorities|android:exported|MAIN|LAUNCHER' "$SRCMF" || sed -n '1,200p' "$SRCMF"
 fi
 
-echo; echo "### AndroidManifest (merged)"
+echo
+echo "### AndroidManifest (merged)"
 MERGED="$ROOT/android/app/build/intermediates/merged_manifest/debug/AndroidManifest.xml"
 if [ -f "$MERGED" ]; then
   grep -nE 'package=|provider|authorities|android:exported|MAIN|LAUNCHER' "$MERGED" || sed -n '1,200p' "$MERGED"
@@ -79,21 +87,25 @@ else
   echo "Merged manifest non presente (esegui: ./gradlew :app:processDebugMainManifest)"
 fi
 
-# === Workflows / APK ===
-echo; echo "### GitHub Actions workflows"
+# === Workflow / output ===
+echo
+echo "### GitHub Actions workflows"
 ls -1 "$ROOT/.github/workflows" 2>/dev/null || echo "nessun workflow"
 
-echo; echo "### APK generati"
+echo
+echo "### APK generati"
 ls -lt "$ROOT/_apk" 2>/dev/null || true
 ls -lt "$ROOT/android/app/build/outputs/apk" 2>/dev/null || true
 
 # === Ultime modifiche ===
-echo; echo "### Ultime modifiche (top 30)"
+echo
+echo "### Ultime modifiche (top 30)"
 find "$ROOT" \( -path "$ROOT/.git/*" -o -path "$ROOT/node_modules/*" -o -path "$ROOT/android/app/build/*" -o -path "$ROOT/.gradle/*" \) -prune -o -type f -printf '%TY-%Tm-%Td %TH:%TM %p\n' 2>/dev/null | sort -r | head -30
 
-echo; echo "Report salvato in: $LOG"
+echo
+echo "Report salvato in: $LOG"
 
-# Copia anche in Download
+# Copia anche in Download per leggerlo dal telefono
 if [ -d /sdcard/Download ]; then
   OUT="/sdcard/Download/Walleet-logs"
   mkdir -p "$OUT"

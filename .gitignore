@@ -29,3 +29,6 @@ dist-ssr
 # Asset generati da Capacitor
 /android/app/src/main/assets/public/
 /android/app/src/main/assets/public/*
+
+# import da Walleet-
+_imported_from_minus/
