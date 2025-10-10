@@ -1,112 +1,70 @@
-name: Android Debug Build
+name: Android CI (Capacitor + Vite)
 
 on:
+  workflow_dispatch:
   push:
     branches: [ "main" ]
-  workflow_dispatch:
 
 jobs:
-  build-android-debug:
-    runs-on: ubuntu-24.04
+  build-android:
+    runs-on: ubuntu-latest
+
+    env:
+      ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
+      JAVA_VERSION: '21'
+      NODE_VERSION: '22'
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
 
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: "npm"
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
 
-      - name: Setup Java 21
+      - name: Setup Java (JDK)
         uses: actions/setup-java@v4
         with:
-          distribution: "temurin"
-          java-version: "21"
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Accept SDK licenses
-        run: yes | sdkmanager --licenses
-
-      - name: Install deps (npm)
-        run: npm install --legacy-peer-deps
-
-      - name: Ensure Capacitor deps (idempotent)
+      - name: Install Android SDK (cmdline-tools)
         run: |
-          npm install @capacitor/android --legacy-peer-deps
-          npm install @capacitor-community/speech-recognition --legacy-peer-deps || true
+          mkdir -p "$ANDROID_SDK_ROOT"
+          cd "$ANDROID_SDK_ROOT"
+          curl -sSLo cmdline-tools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          mkdir -p cmdline-tools/latest
+          unzip -q cmdline-tools.zip -d cmdline-tools
+          mv cmdline-tools/cmdline-tools/* cmdline-tools/latest/ || true
+          rm -f cmdline-tools.zip
+          echo "y" | cmdline-tools/latest/bin/sdkmanager --licenses
+          cmdline-tools/latest/bin/sdkmanager \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
 
-      # === Keystore debug STABILE: se il secret c'è, lo installa; altrimenti salta con messaggio ===
-      - name: Install stable debug keystore
+      - name: NPM install
+        run: npm ci || npm i
+
+      - name: Build web (Vite -> www/)
+        run: npm run build
+
+      - name: Capacitor sync
+        run: npx cap sync android
+
+      - name: Gradle assembleDebug
+        working-directory: android
         env:
-          ANDROID_DEBUG_KEYSTORE_B64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_B64 }}
-        shell: bash
-        run: |
-          if [[ -n "$ANDROID_DEBUG_KEYSTORE_B64" ]]; then
-            mkdir -p ~/.android
-            echo "$ANDROID_DEBUG_KEYSTORE_B64" | base64 -d > ~/.android/debug.keystore
-            chmod 600 ~/.android/debug.keystore
-            echo "Installed stable debug keystore at ~/.android/debug.keystore"
-          else
-            echo "Secret ANDROID_DEBUG_KEYSTORE_B64 not set; using default debug keystore."
-          fi
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+          JAVA_TOOL_OPTIONS: "-Xmx1g"
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs='-Xmx1g -Dfile.encoding=UTF-8' -Dorg.gradle.daemon=false"
+        run: ./gradlew --no-daemon assembleDebug
 
-      # === Versioning AUTO: ogni run aumenta versionCode e aggiorna versionName ===
-      - name: Compute version code/name
-        shell: bash
-        run: |
-          RUN_NO="${GITHUB_RUN_NUMBER:-0}"
-          VERSION_CODE=$((100000 + RUN_NO))
-          VERSION_NAME="$(node -p "require('./package.json').version")+${RUN_NO}"
-          {
-            echo "VERSION_CODE=$VERSION_CODE"
-            echo "VERSION_NAME=$VERSION_NAME"
-          } >> "$GITHUB_ENV"
-          echo "Computed VERSION_CODE=$VERSION_CODE"
-          echo "Computed VERSION_NAME=$VERSION_NAME"
-
-      # === Prepara gli asset web per Capacitor ===
-      # Se c'è legacy_www_final/index.html usa il bundle buono; altrimenti builda con Vite
-      - name: Prepare web assets (legacy or build)
-        shell: bash
-        run: |
-          rm -rf www
-          if [[ -f legacy_www_final/index.html ]]; then
-            echo "Using legacy_www_final as webDir"
-            mkdir -p www
-            cp -R legacy_www_final/* www/
-          else
-            echo "Building with Vite -> dist, then copying to www/"
-            npm run build
-            mv dist www
-          fi
-          test -f www/index.html
-
-      - name: Capacitor sync (android)
-        run: npx cap add android || npx cap sync android
-
-      - name: Sanity check (index + assets)
-        run: |
-          test -f android/app/src/main/assets/public/index.html
-          ls -l android/app/src/main/assets/public | head
-          ls -l android/app/src/main/assets/public/assets 2>/dev/null | head || true
-
-      - name: Gradle build (debug)
-        working-directory: ./android
-        run: |
-          chmod +x ./gradlew
-          ./gradlew clean assembleDebug \
-            -PVERSION_CODE=${{ env.VERSION_CODE }} \
-            -PVERSION_NAME=${{ env.VERSION_NAME }}
-
-      - name: Upload APK (android-build)
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: android-build
+          name: app-debug.apk
           path: android/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: warn
+          compression-level: 0
