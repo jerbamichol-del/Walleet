@@ -1,57 +1,36 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# ========================================
-# WALLEET SNAPSHOT — versione migliorata (non si blocca)
-# ========================================
+# =============================================
+# WALLEET — SAVE SNAPSHOT
+# =============================================
 
-STAMP=$(date +"%Y-%m-%d_%H-%M-%S")
-OUTDIR="/data/data/com.termux/files/home/Walleet/_snapshots"
-mkdir -p "$OUTDIR"
+PROJECT_DIR="/data/data/com.termux/files/home/Walleet"
+SNAPSHOT_DIR="$PROJECT_DIR/_snapshots"
 
-echo ""
-echo "🧠 Inserisci una breve descrizione dello stato stabile (es: 'fix audio' o 'post build OK'):"
-read NOTE
+mkdir -p "$SNAPSHOT_DIR"
 
-TAG_NOTE=$(echo "$NOTE" | tr ' ' '-' | tr -cd '[:alnum:]-_')
-TAG="stable-$STAMP-$TAG_NOTE"
+echo "🧠 Inserisci una breve descrizione dello stato stabile (es: fix-audio, post-build OK):"
+read DESC
 
-echo ""
-echo "📦 Creazione snapshot Walleet ($TAG)..."
-sleep 0.5
+# Genera timestamp completo: giorno-mese-anno_ora-minuti-secondi
+TIMESTAMP=$(date +"%d-%m-%Y_%H-%M-%S")
 
-# --- 1️⃣ Esegue wstatus e salva il log
-LOGFILE="$OUTDIR/status_$STAMP.log"
-bash /data/data/com.termux/files/home/Walleet/android/walleet_status.sh > "$LOGFILE" 2>&1 &
-PID=$!
+# Nome log e tag Git
+LOG_FILE="$SNAPSHOT_DIR/status_${TIMESTAMP}-${DESC}.log"
+TAG_NAME="stable-${TIMESTAMP}-${DESC}"
 
-spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
-i=0
-while kill -0 $PID 2>/dev/null; do
-  i=$(( (i+1) % 10 ))
-  printf "\r🧩 Generazione log %s" "${spin:$i:1}"
-  sleep 0.2
-done
-wait $PID
-printf "\r✅ Log generato: $LOGFILE\n"
+# Salva lo stato git e l'elenco dei file principali
+echo "📦 Creazione snapshot Walleet ($TAG_NAME)..."
+{
+  echo "Tag Git: $TAG_NAME"
+  echo "Data: $TIMESTAMP"
+  echo "Descrizione: $DESC"
+  echo ""
+  git -C "$PROJECT_DIR" status
+} > "$LOG_FILE"
 
-# --- 2️⃣ Verifica stato Git
-GITDIR="/data/data/com.termux/files/home/Walleet"
-CHANGES=$(git -C "$GITDIR" status --porcelain)
+# Crea tag Git
+git -C "$PROJECT_DIR" add .
+git -C "$PROJECT_DIR" commit -m "Snapshot $TAG_NAME" >/dev/null 2>&1
+git -C "$PROJECT_DIR" tag "$TAG_NAME"
 
-if [ -z "$CHANGES" ]; then
-  echo "ℹ️ Nessuna modifica da salvare nel repository Git."
-else
-  echo "🗃️  Aggiungo modifiche al repository..."
-  git -C "$GITDIR" add . >/dev/null 2>&1
-  git -C "$GITDIR" commit -m "snapshot: stato stabile $STAMP ($NOTE)" --no-edit >/dev/null 2>&1
-  echo "✅ Commit completato."
-fi
-
-# --- 3️⃣ Crea tag sempre, anche se non ci sono modifiche
-git -C "$GITDIR" tag -f "$TAG" >/dev/null 2>&1
-git -C "$GITDIR" push origin main --tags >/dev/null 2>&1
-
-echo ""
-echo "✅ Snapshot salvato con successo!"
-echo "   → File: $LOGFILE"
-echo "   → Tag Git: $TAG"
-echo ""
+echo "✅ Snapshot creato: $LOG_FILE"

@@ -1,7 +1,6 @@
 #!/data/data/com.termux/files/usr/bin/bash
 # =============================================
-# WALLEET - WRESTORE (versione migliorata)
-# Mostra snapshot con numero, data, ora e descrizione
+# WALLEET — RESTORE SNAPSHOT
 # =============================================
 
 SNAPSHOT_DIR="/data/data/com.termux/files/home/Walleet/_snapshots"
@@ -16,33 +15,29 @@ if [ ! -d "$SNAPSHOT_DIR" ] || [ -z "$(ls -A "$SNAPSHOT_DIR" 2>/dev/null)" ]; th
   exit 1
 fi
 
-# --- Lista tag Git ordinati per data decrescente
-TAGS=$(git -C "$PROJECT_DIR" tag | grep '^stable-' | sort -r)
-declare -A TAG_DESC
-
+# --- Lista tag Git
+declare -A TAG_DESC_ARRAY
 i=1
 echo ""
 echo "🗃️  SNAPSHOT DISPONIBILI:"
-for tag in $TAGS; do
-  DATE=$(echo "$tag" | cut -d'-' -f2-3 | tr '_' ' ')
-  DESC=$(echo "$tag" | cut -d'-' -f4- | tr '-' ' ')
-  TAG_DESC[$i]="$tag"
-  printf "[%d] %s\n     📅 Data/Ora: %s\n     📝 Descrizione: %s\n\n" "$i" "$tag" "$DATE" "$DESC"
+for tag in $(git -C "$PROJECT_DIR" tag | grep '^stable-' | sort -r); do
+  TAG_DATE=$(echo "$tag" | cut -d'-' -f2-4 | tr '_' ' ')
+  TAG_DESC=$(echo "$tag" | cut -d'-' -f5- | tr '-' ' ')
+  TAG_DESC_ARRAY[$i]="$tag"
+  printf "[%d] %s\n     📅 Data/Ora: %s\n     📝 Descrizione: %s\n\n" "$i" "$tag" "$TAG_DATE" "$TAG_DESC"
   ((i++))
 done
 
 # --- Scelta dell’utente
 read -p "👉 Inserisci il numero dello snapshot da ripristinare: " NUM
 
-TAG_SELECTED=${TAG_DESC[$NUM]}
+TAG_SELECTED=${TAG_DESC_ARRAY[$NUM]}
 if [ -z "$TAG_SELECTED" ]; then
   echo "❌ Numero non valido."
   exit 1
 fi
 
 echo "🔄 Ripristino snapshot: $TAG_SELECTED"
-echo
 git -C "$PROJECT_DIR" fetch --tags >/dev/null 2>&1
 git -C "$PROJECT_DIR" checkout "$TAG_SELECTED" >/dev/null 2>&1
-
 echo "✅ Ripristino completato con successo!"
