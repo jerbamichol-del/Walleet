@@ -1,95 +1,125 @@
-#!/bin/bash
-
-# ========================================================
-# WALLEET - STATUS COMPLETO PROGETTO
-# ========================================================
-
-# Imposta root del progetto
-PROJECT_ROOT="/data/data/com.termux/files/home/Walleet"
+#!/data/data/com.termux/files/usr/bin/bash
+# ========================================
+# WALLEET STATUS — Diagnostica completa (manuale)
+# ========================================
+# Percorsi assoluti già impostati
+# Non salva più automaticamente
+# Esegui con:
+#   bash /data/data/com.termux/files/home/Walleet/android/walleet_status.sh
+# o alias: wstatus
+# ========================================
 
 echo "==============================="
-echo "WALLEET - STATUS COMPLETO"
+echo "WALLEET — STATUS COMPLETO"
 echo "==============================="
+
+# --- 1️⃣ Ambiente ---
+echo "1️⃣ Ambiente"
+echo "• Termux: rilevato"
+echo "  - Device: $(getprop ro.product.manufacturer) $(getprop ro.product.model)"
+echo "  - Model: $(getprop ro.product.model)"
+echo "  - SDK: $(getprop ro.build.version.sdk)"
+echo "  - Arch: $(uname -m)"
+echo "  - Shell: $SHELL"
+echo "  - Termux Variables:"
+env | grep TERMUX_ || echo "  ⚠️ nessuna variabile TERMUX trovata"
+echo "  - Node: $(node -v 2>/dev/null)"
+echo "  - npm: $(npm -v 2>/dev/null)"
+echo "  - Java: $(java -version 2>&1 | head -n1)"
+echo "  - Vite: $(npx vite -v 2>/dev/null)"
+echo "  - gh CLI: $(gh --version 2>/dev/null | head -n1)"
+
+# --- 2️⃣ File chiave & entrypoint ---
 echo ""
-
-# 1️⃣ Verifica presenza principali cartelle e file
-echo "1️⃣ Controllo file e cartelle principali..."
-declare -a paths=(
-  "$PROJECT_ROOT/android/app/src/main/java/com/example/gestorespese/MainActivity.java"
-  "$PROJECT_ROOT/android/app/src/main/assets/public"
-  "$PROJECT_ROOT/android/app/src/main/assets/public/index.html"
-  "$PROJECT_ROOT/android/app/src/main/assets/public/sw.js"
-  "$PROJECT_ROOT/android/app/src/main/assets/public/manifest.json"
+echo "2️⃣ File chiave & entrypoint"
+FILES=(
+"/data/data/com.termux/files/home/Walleet/index.html"
+"/data/data/com.termux/files/home/Walleet/vite.config.js"
+"/data/data/com.termux/files/home/Walleet/capacitor.config.json"
+"/data/data/com.termux/files/home/Walleet/package.json"
+"/data/data/com.termux/files/home/Walleet/src/main.jsx"
+"/data/data/com.termux/files/home/Walleet/src/App.jsx"
+"/data/data/com.termux/files/home/Walleet/src/components/NavBar.jsx"
+"/data/data/com.termux/files/home/Walleet/public/index.css"
+"/data/data/com.termux/files/home/Walleet/public/manifest.json"
+"/data/data/com.termux/files/home/Walleet/www/index.html"
+"/data/data/com.termux/files/home/Walleet/dist/index.html"
+"/data/data/com.termux/files/home/Walleet/legacy_www_final/index.html"
+"/data/data/com.termux/files/home/Walleet/android/app/src/main/java/com/example/gestorespese/MainActivity.java"
+"/data/data/com.termux/files/home/Walleet/android/app/build.gradle"
+"/data/data/com.termux/files/home/Walleet/android/gradle/wrapper/gradle-wrapper.properties"
 )
-
-for path in "${paths[@]}"; do
-  if [ -e "$path" ]; then
-    echo "✅ Presente: $path"
-  else
-    echo "❌ Mancante: $path"
-  fi
+for f in "${FILES[@]}"; do
+  [ -f "$f" ] && echo "✅ $f" || echo "❌ $f"
 done
-echo ""
 
-# 2️⃣ Plugin Capacitor installati
-echo "2️⃣ Plugin Capacitor installati:"
-if [ -d "$PROJECT_ROOT/node_modules/@capacitor-community/speech-recognition" ]; then
-  version=$(cat "$PROJECT_ROOT/node_modules/@capacitor-community/speech-recognition/package.json" | grep '"version"' | head -1)
-  echo "✅ Speech Recognition plugin: $version"
+# --- 3️⃣ Bundle web ---
+echo ""
+echo "3️⃣ Bundle web"
+BUNDLES=(
+"/data/data/com.termux/files/home/Walleet/legacy_www_final"
+"/data/data/com.termux/files/home/Walleet/www"
+)
+for d in "${BUNDLES[@]}"; do
+  [ -d "$d" ] && echo "✅ $d" || echo "❌ $d"
+done
+
+# --- 4️⃣ Capacitor ---
+echo ""
+echo "4️⃣ Capacitor config"
+CONFIG="/data/data/com.termux/files/home/Walleet/capacitor.config.json"
+if [ -f "$CONFIG" ]; then
+  grep -E '"appId"|"appName"' "$CONFIG"
 else
-  echo "❌ Speech Recognition plugin NON installato"
+  echo "⚠️ capacitor.config.json non trovato"
 fi
-echo ""
 
-# 3️⃣ Permesso microfono runtime in MainActivity.java
-echo "3️⃣ Controllo permesso microfono runtime..."
-if grep -q "Manifest.permission.RECORD_AUDIO" "$PROJECT_ROOT/android/app/src/main/java/com/example/gestorespese/MainActivity.java"; then
-  echo "✅ Permesso microfono gestito a runtime"
+# --- 5️⃣ Gradle / Android ---
+echo ""
+echo "5️⃣ Android / Gradle"
+GRADLE="/data/data/com.termux/files/home/Walleet/android/app/build.gradle"
+if [ -f "$GRADLE" ]; then
+  grep 'applicationId' "$GRADLE" || echo "⚠️ Nessun applicationId rilevato"
+  grep 'compileSdk' "$GRADLE"
+  grep 'targetSdk' "$GRADLE"
 else
-  echo "❌ Permesso microfono NON presente"
+  echo "⚠️ build.gradle non trovato"
 fi
-echo ""
 
-# 4️⃣ Service Worker disabilitato per debug
-echo "4️⃣ Controllo Service Worker..."
-if grep -q "caches.match" "$PROJECT_ROOT/android/app/src/main/assets/public/sw.js"; then
-  echo "⚠️ Service Worker presente (verifica se disabilitato per debug)"
-else
-  echo "✅ Service Worker non presente / disabilitato"
-fi
+# --- 6️⃣ Git ---
 echo ""
+echo "6️⃣ Git"
+cd /data/data/com.termux/files/home/Walleet || exit
+echo "• Branch attuale: $(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
+echo "• Ultimi 5 commit:"
+git log -5 --oneline 2>/dev/null
+echo "• Modifiche locali:"
+git status --short
 
-# 5️⃣ Verifica build Android (debug)
-echo "5️⃣ Controllo eventuali build Android:"
-if [ -f "$PROJECT_ROOT/android/app/build/outputs/apk/debug/app-debug.apk" ]; then
-  echo "✅ APK debug già generato"
-else
-  echo "⚠️ APK debug NON trovato, puoi eseguire './gradlew assembleDebug'"
-fi
+# --- 7️⃣ Service Worker ---
 echo ""
+echo "7️⃣ Service Worker"
+SWS=(
+"/data/data/com.termux/files/home/Walleet/legacy_www_final/service-worker.js"
+"/data/data/com.termux/files/home/Walleet/legacy_www_final/sw.js"
+)
+for f in "${SWS[@]}"; do
+  [ -f "$f" ] && echo "✅ $f" || echo "❌ $f"
+done
 
-# 6️⃣ Stato git
-echo "6️⃣ Stato Git:"
-cd "$PROJECT_ROOT" || exit
-git_status=$(git status -s)
-if [ -z "$git_status" ]; then
-  echo "✅ Tutti i file tracciati e committati"
-else
-  echo "⚠️ File non tracciati o modificati:"
-  echo "$git_status"
-fi
+# --- 8️⃣ Manifest / Icone ---
 echo ""
+echo "8️⃣ Manifest / Icone"
+ICONS=(
+"/data/data/com.termux/files/home/Walleet/legacy_www_final/manifest.json"
+"/data/data/com.termux/files/home/Walleet/legacy_www_final/icons/icon-192.png"
+"/data/data/com.termux/files/home/Walleet/legacy_www_final/icons/icon-512.png"
+)
+for f in "${ICONS[@]}"; do
+  [ -f "$f" ] && echo "✅ $f" || echo "❌ $f"
+done
 
-# 7️⃣ Repository GitHub
-echo "7️⃣ Repository GitHub:"
-remote=$(git remote -v 2>/dev/null | head -1)
-if [ -n "$remote" ]; then
-  echo "✅ Remote: $remote"
-else
-  echo "❌ Remote non configurato"
-fi
 echo ""
-
 echo "==============================="
 echo "FINE STATUS"
 echo "==============================="

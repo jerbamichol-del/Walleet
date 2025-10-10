@@ -8,8 +8,11 @@ android {
         applicationId "com.example.gestorespese"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+
+        // --- VERSIONING AUTO FROM CI ---
+        versionCode project.hasProperty('VERSION_CODE') ? project.VERSION_CODE.toInteger() : 1
+        versionName project.hasProperty('VERSION_NAME') ? project.VERSION_NAME.toString() : "1.0"
+
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
         aaptOptions {
@@ -22,6 +25,9 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            // usa la debug.keystore di default (~/.android/debug.keystore)
         }
     }
 }

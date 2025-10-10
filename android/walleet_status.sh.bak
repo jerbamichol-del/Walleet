@@ -1,0 +1,351 @@
+#!/usr/bin/env bash
+# Walleet super status – Termux/CI aware, exhaustive + installer alias/hook
+# Usage:
+#   bash android/walleet_status.sh            -> mostra report a schermo
+#   bash android/walleet_status.sh --save     -> genera e salva (fallback automatici)
+#   bash android/walleet_status.sh --install  -> crea alias 'wstatus' + hook post-commit (usa --save)
+set -e
+
+ROOT="/data/data/com.termux/files/home/Walleet"
+cd "$ROOT" 2>/dev/null || true
+
+# ===== Helpers =====
+have() { command -v "$1" >/dev/null 2>&1; }
+exists() { [ -e "$1" ]; }
+redact_remote() { sed -E 's#(https://)([^:@/]+):([^@]+)@#\1<user>:\*\*\*@#g'; }
+
+# ANSI (solo se TTY) — usa $'' per ESC reali (no \033 letterale)
+if [ -t 1 ]; then
+  BOLD=$'\e[1m'; DIM=$'\e[2m'; RED=$'\e[31m'; GRN=$'\e[32m'; YEL=$'\e[33m'; BLU=$'\e[34m'; RST=$'\e[0m'
+else
+  BOLD=""; DIM=""; RED=""; GRN=""; YEL=""; BLU=""; RST=""
+fi
+header() { printf "%b\n" "${BOLD}$1${RST}"; }
+
+# ===== SAVE mode (senza richiedere /sdcard) =====
+if [ "${1:-}" = "--save" ]; then
+  TMP="$(mktemp)"
+  "$0" > "$TMP" 2>&1 || true
+
+  TS="$(date +%F_%H%M%S)"
+  INT_DIR="$HOME/.walleet/reports"
+  INT_FILE="$INT_DIR/walleet_status_$TS.txt"
+  INT_LAST="$INT_DIR/walleet_status_last.txt"
+  mkdir -p "$INT_DIR"
+  cp "$TMP" "$INT_FILE"
+  ln -sf "$INT_FILE" "$INT_LAST"
+
+  SAVED="• Interno: $INT_LAST"
+
+  if [ -d /sdcard/Download ] && [ -w /sdcard/Download ]; then
+    EXT_FILE="/sdcard/Download/walleet_status_last.txt"
+    cp "$TMP" "$EXT_FILE" 2>/dev/null || true
+    SAVED="$SAVED\n• Esterno: $EXT_FILE"
+  fi
+
+  if have termux-notification; then
+    termux-notification -t "Walleet status salvato" -c "$(echo -e "$SAVED")" >/dev/null 2>&1 || true
+  fi
+  if have termux-share; then
+    termux-share -a send -c "text/plain" -e title "Walleet status $TS" "$TMP" >/dev/null 2>&1 || true
+  fi
+  if have termux-clipboard-set; then
+    echo -e "$SAVED" | termux-clipboard-set >/dev/null 2>&1 || true
+  fi
+
+  echo -e "Report salvato:\n$SAVED"
+  rm -f "$TMP"
+  exit 0
+fi
+
+# ===== Installer mode =====
+if [ "${1:-}" = "--install" ]; then
+  echo "== INSTALLER =="
+  # 1) Alias wstatus
+  if ! grep -q 'alias wstatus=' "$HOME/.bashrc" 2>/dev/null; then
+    echo "alias wstatus=\"bash $ROOT/android/walleet_status.sh\"" >> "$HOME/.bashrc"
+    echo "• Alias aggiunto a ~/.bashrc -> wstatus"
+  else
+    echo "• Alias già presente in ~/.bashrc"
+  fi
+  # 2) Hook post-commit -> usa --save (salva sempre anche senza /sdcard)
+  HOOK="$ROOT/.git/hooks/post-commit"
+  mkdir -p "$(dirname "$HOOK")"
+  cat > "$HOOK" <<'EOF'
+#!/usr/bin/env bash
+ROOT="/data/data/com.termux/files/home/Walleet"
+bash "$ROOT/android/walleet_status.sh" --save >/dev/null 2>&1 || true
+EOF
+  chmod +x "$HOOK"
+  echo "• Hook post-commit creato: .git/hooks/post-commit"
+  # 3) Wrapper in ~/bin per richiamarlo ovunque
+  mkdir -p "$HOME/bin"
+  cat > "$HOME/bin/wstatus" <<'EOF'
+#!/usr/bin/env bash
+bash /data/data/com.termux/files/home/Walleet/android/walleet_status.sh "$@"
+EOF
+  chmod +x "$HOME/bin/wstatus"
+  grep -q 'export PATH=$HOME/bin:$PATH' "$HOME/.bashrc" || echo 'export PATH=$HOME/bin:$PATH' >> "$HOME/.bashrc"
+  echo "• Comando 'wstatus' aggiunto in ~/bin (riapri la shell o: . ~/.bashrc)"
+  echo "== FATTO =="
+  exit 0
+fi
+
+# ===== Report (stampa a schermo) =====
+printf "%s\n" "==============================="
+header "WALLEET — STATUS COMPLETO"
+printf "%s\n" "==============================="
+
+# 1) Ambiente / Termux / Device
+header "1️⃣ Ambiente"
+if have termux-info; then
+  printf "   • Termux: %brilevato%b\n" "$GRN" "$RST"
+  termux-info | sed 's/^/     - /' | head -n 10 || true
+else
+  printf "   • Termux: %bnon rilevato (ok in CI)%b\n" "$YEL" "$RST"
+fi
+if have getprop; then
+  echo "   • Device: $(getprop ro.product.manufacturer) $(getprop ro.product.model) (SDK $(getprop ro.build.version.sdk))"
+fi
+printf "   • Storage /sdcard: %s\n" "$( [ -d /sdcard ] && printf "%bOK%b" "$GRN" "$RST" || printf "%bno%b" "$YEL" "$RST")"
+echo -n "   • Arch: "; uname -m 2>/dev/null || echo "n/d"
+echo -n "   • Shell: "; echo "${SHELL:-$0}"
+echo
+
+# 2) Toolchain locale
+header "2️⃣ Toolchain locale"
+if have node; then echo "   • Node: $(node -v)"; else echo "   • Node: n/d (ok: build in CI)"; fi
+if have npm; then echo "   • npm:  $(npm -v)"; fi
+if have yarn; then echo "   • yarn: $(yarn -v)"; fi
+if have pnpm; then echo "   • pnpm: $(pnpm -v)"; fi
+if have java; then echo "   • Java: $(java -version 2>&1 | head -n1)"; fi
+if have keytool; then echo "   • keytool: $(keytool -help </dev/null 2>&1 | head -n1)"; fi
+if have gh; then echo "   • gh: $(gh --version | head -n1)"; else echo "   • gh: non installato (ok)"; fi
+if [ -f "$ROOT/node_modules/vite/package.json" ]; then
+  VITEV=$(node -p "require('$ROOT/node_modules/vite/package.json').version" 2>/dev/null || echo "")
+  [ -n "$VITEV" ] && echo "   • Vite: v$VITEV"
+fi
+echo
+
+# 3) File chiave & entrypoint
+header "3️⃣ File chiave & entrypoint"
+for p in \
+  "$ROOT/index.html" \
+  "$ROOT/vite.config.js" \
+  "$ROOT/capacitor.config.json" \
+  "$ROOT/package.json" \
+  "$ROOT/src/main.jsx" "$ROOT/src/main.tsx" \
+  "$ROOT/src/App.jsx"  "$ROOT/src/App.tsx" \
+  "$ROOT/src/components/NavBar.jsx" \
+  "$ROOT/public/index.css" "$ROOT/public/manifest.json" \
+  "$ROOT/www/index.html" "$ROOT/dist/index.html" \
+  "$ROOT/legacy_www_final/index.html" \
+  "$ROOT/android/app/src/main/java/com/example/gestorespese/MainActivity.java" \
+  "$ROOT/android/app/src/main/assets/public/index.html" \
+  "$ROOT/android/app/build.gradle" \
+  "$ROOT/android/gradle/wrapper/gradle-wrapper.properties"
+do
+  [ -e "$p" ] && echo "   ✅ ${p#"$ROOT/"}" || echo "   ❌ ${p#"$ROOT/"}"
+done
+if exists "$ROOT/index.html"; then
+  ROOT_ID=$(sed -n 's/.*id="\([^"]*\)".*/\1/p' "$ROOT/index.html" | grep -E '^(root|app)$' | head -n1)
+  echo "   • index.html root id: ${ROOT_ID:-n/d}"
+fi
+echo
+
+# 4) Bundle web che finirà nell’APK
+header "4️⃣ Bundle web che finirà nell’APK"
+if exists "$ROOT/legacy_www_final/index.html"; then
+  printf "   → Modalità %bLEGACY%b attiva: copierò legacy_www_final/ → www/ %b(stabile)%b\n" "$BOLD" "$RST" "$GRN" "$RST"
+elif exists "$ROOT/dist/index.html"; then
+  printf "   → Modalità %bVITE%b: dist/ verrà rinominata in www/\n" "$BOLD" "$RST"
+elif exists "$ROOT/www/index.html"; then
+  printf "   → %bAttenzione%b: www/ esiste ma in CI viene ricreata\n" "$YEL" "$RST"
+else
+  printf "   → %bNessun bundle trovato%b (né legacy_www_final/index.html né dist/index.html)\n" "$RED" "$RST"
+fi
+echo
+
+# 5) Capacitor & appId
+header "5️⃣ Capacitor & appId"
+APPID_CFG=$(sed -n 's/.*"appId": *"\([^"]*\)".*/\1/p' "$ROOT/capacitor.config.json" 2>/dev/null | head -n1)
+APPNAME_CFG=$(sed -n 's/.*"appName": *"\([^"]*\)".*/\1/p' "$ROOT/capacitor.config.json" 2>/dev/null | head -n1)
+APPID_GRADLE=$(sed -n 's/.*applicationId *"\([^"]*\)".*/\1/p' "$ROOT/android/app/build.gradle" 2>/dev/null | head -n1)
+echo "   • capacitor.appId:   ${APPID_CFG:-n/d}"
+echo "   • capacitor.appName: ${APPNAME_CFG:-n/d}"
+echo "   • gradle.appId:      ${APPID_GRADLE:-n/d}"
+if [ -n "$APPID_CFG" ] && [ -n "$APPID_GRADLE" ]; then
+  if [ "$APPID_CFG" = "$APPID_GRADLE" ]; then
+    printf "   → appId coerente %b✅%b\n" "$GRN" "$RST"
+  else
+    printf "   → appId %bNON coerente%b (rischio update/install)\n" "$RED" "$RST"
+  fi
+fi
+echo
+
+# 6) Dipendenze principali
+header "6️⃣ Dipendenze principali"
+if exists "$ROOT/package.json"; then
+  node -e '
+    const p=require("./package.json");
+    const get=(s)=> (p.dependencies&&p.dependencies[s])||(p.devDependencies&&p.devDependencies[s])||"";
+    const list=["react","react-dom","@capacitor/core","@capacitor/android","@capacitor/cli","@capacitor-community/speech-recognition","vite","vite-plugin-pwa","@vitejs/plugin-react","@vitejs/plugin-vue","typescript","@google/genai","idb","recharts"];
+    for (const n of list) console.log("   • "+n+": "+(get(n)||"n/d"));
+  ' 2>/dev/null || true
+else
+  echo "   • package.json non trovato"
+fi
+echo
+
+# 7) Service Worker
+header "7️⃣ Service Worker"
+SW_FOUND=0
+for f in "$ROOT"/{www,legacy_www_final,public}/service-worker.js "$ROOT"/{www,legacy_www_final,public}/sw.js; do
+  [ -f "$f" ] && { echo "   • $f"; SW_FOUND=1; }
+done
+if [ "$SW_FOUND" -eq 0 ]; then
+  echo "   • Nessun SW trovato (ok in debug)"
+else
+  if grep -Rqs "navigator.serviceWorker.register" "$ROOT"/{index.html,www/index.html,legacy_www_final/index.html} 2>/dev/null; then
+    printf "   → Registrazione SW potenzialmente attiva %b(in debug può servire clear cache)%b\n" "$YEL" "$RST"
+  else
+    echo "   → SW presente ma non registrato (debug-friendly)"
+  fi
+fi
+echo
+
+# 8) Android / Gradle
+header "8️⃣ Android / Gradle"
+WRAP="$ROOT/android/gradle/wrapper/gradle-wrapper.properties"
+if exists "$WRAP"; then
+  GW=$(sed -n 's/.*distributionUrl=.*gradle-\(.*\)-all.zip/\1/p' "$WRAP" | head -n1)
+  echo "   • Gradle wrapper: $GW"
+fi
+if exists "$ROOT/android/app/build.gradle"; then
+  if grep -q "VERSION_CODE" "$ROOT/android/app/build.gradle"; then
+    printf "   • build.gradle: override VERSION_CODE/NAME da -P %bOK%b\n" "$GRN" "$RST"
+  else
+    printf "   • build.gradle: versionCode/versionName fissi %b(autoversione CI non attiva)%b\n" "$YEL" "$RST"
+  fi
+  VARS="$ROOT/android/variables.gradle"
+  if exists "$VARS"; then
+    sed -n 's/.*compileSdkVersion *= *\([0-9]\+\).*/   • compileSdk:\1/p; s/.*targetSdkVersion *= *\([0-9]\+\).*/   • targetSdk:\1/p; s/.*minSdkVersion *= *\([0-9]\+\).*/   • minSdk:\1/p' "$VARS" || true
+  fi
+fi
+MAN="$ROOT/android/app/src/main/AndroidManifest.xml"
+if exists "$MAN"; then
+  printf "   • Permesso RECORD_AUDIO: %s\n" "$( grep -q "RECORD_AUDIO" "$MAN" && printf "%bpresente%b" "$GRN" "$RST" || printf "%bassente%b" "$YEL" "$RST" )"
+else
+  echo "   • AndroidManifest.xml non trovato"
+fi
+MA="$ROOT/android/app/src/main/java/com/example/gestorespese/MainActivity.java"
+if exists "$MA"; then
+  if grep -q "extends BridgeActivity" "$MA"; then
+    printf "   • MainActivity: estende BridgeActivity (Capacitor) %bOK%b\n" "$GRN" "$RST"
+  else
+    printf "   • MainActivity: %bverificare estensione BridgeActivity%b\n" "$YEL" "$RST"
+  fi
+fi
+echo
+
+# 9) Git
+header "9️⃣ Git"
+BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+echo "   • Branch: ${BRANCH:-n/d}"
+echo "   • Remote:"
+git remote -v 2>/dev/null | head -n2 | redact_remote | sed 's/^/     - /'
+echo "   • Ultimi 5 commit:"
+git --no-pager log --oneline -n 5 2>/dev/null | sed 's/^/     - /' || echo "     - n/d"
+echo "   • Modifiche locali:"
+git status --porcelain 2>/dev/null | sed 's/^/     - /' || echo "     - n/d"
+echo
+
+# 10) GitHub Actions
+header "🔟 GitHub Actions"
+WF="$ROOT/.github/workflows"
+if [ -d "$WF" ]; then
+  echo "   • Workflow trovati:"; ls -1 "$WF" | sed 's/^/     - /'
+  if grep -Rqs 'setup-java@' "$WF"; then
+    grep -Rns 'java-version' "$WF" | sed 's/^/     • /'
+  fi
+  grep -Rqs 'Install stable debug keystore' "$WF" && echo "   • Keystore stabile: OK" || echo "   • Keystore stabile: MANCANTE"
+  grep -Rqs 'Compute version code/name' "$WF" && echo "   • Autoversione: OK" || echo "   • Autoversione: MANCANTE"
+  if grep -RqsF '-PVERSION_CODE=${{ env.VERSION_CODE }}' "$WF" && grep -RqsF '-PVERSION_NAME=${{ env.VERSION_NAME }}' "$WF"; then
+    echo "   • Gradle -P VERSION_*: OK"
+  else
+    echo "   • Gradle -P VERSION_*: MANCANTE"
+  fi
+  grep -Rqs 'Prepare web assets (legacy or build)' "$WF" && echo "   • Gestione web assets (legacy/Vite): OK" || echo "   • Gestione web assets: MANCANTE"
+else
+  echo "   • Nessuna cartella workflow"
+fi
+if have gh; then
+  if gh secret list 2>/dev/null | grep -q '^ANDROID_DEBUG_KEYSTORE_B64'; then
+    echo "   • Secret ANDROID_DEBUG_KEYSTORE_B64: presente"
+  else
+    echo "   • Secret ANDROID_DEBUG_KEYSTORE_B64: assente"
+  fi
+else
+  echo "   • gh CLI non installata (skip secrets)"
+fi
+echo
+
+# 11) Diagnostica white screen (link <script>) — fix CDN
+header "1️⃣1️⃣ Diagnostica schermata bianca (static)"
+check_html_js() {
+  local H="$1"
+  [ -f "$H" ] || return 0
+  local JS
+  JS=$(sed -n 's/.*<script[^>]*src="\([^"]*\)".*/\1/p' "$H" | head -n1)
+
+  if [ -z "$JS" ]; then
+    echo "   • ${H#"$ROOT/"}: nessun <script src> esplicito (ok con bundler)"
+    return 0
+  fi
+
+  case "$JS" in
+    http://*|https://*)
+      echo "   • ${H#"$ROOT/"} -> script ${JS} OK (remoto/CDN)"
+      ;;
+    /*)
+      if [ -f "$ROOT$JS" ]; then
+        echo "   • ${H#"$ROOT/"} -> script ${JS} OK"
+      else
+        echo "   • ${H#"$ROOT/"} -> script ${JS} NON trovato (path assoluto)"
+      fi
+      ;;
+    *)
+      if [ -f "$ROOT/$JS" ]; then
+        echo "   • ${H#"$ROOT/"} -> script ${JS} OK"
+      else
+        echo "   • ${H#"$ROOT/"} -> script ${JS} NON trovato (relativo)"
+      fi
+      ;;
+  esac
+}
+check_html_js "$ROOT/legacy_www_final/index.html"
+check_html_js "$ROOT/dist/index.html"
+check_html_js "$ROOT/www/index.html"
+check_html_js "$ROOT/index.html"
+echo
+
+# 12) PWA / Manifest / Icone
+header "1️⃣2️⃣ PWA / Manifest / Icone"
+for f in \
+  "$ROOT/legacy_www_final/manifest.json" \
+  "$ROOT/www/manifest.json" \
+  "$ROOT/public/manifest.json" \
+  "$ROOT/legacy_www_final/assets/manifest-"*".json" \
+  "$ROOT/www/assets/manifest-"*".json" \
+  "$ROOT/dist/assets/manifest-"*".json"
+do
+  [ -f "$f" ] && echo "   • $(realpath --relative-to="$ROOT" "$f" 2>/dev/null || echo "${f#"$ROOT/"}")"
+done
+for icon in "$ROOT"/{legacy_www_final,www,public}/icons/icon-192.png "$ROOT"/{legacy_www_final,www,public}/icons/icon-512.png; do
+  [ -f "$icon" ] && echo "   • Icona: ${icon#"$ROOT/"}"
+done
+echo
+
+printf "%s\n" "==============================="
+header "FINE STATUS"
+printf "%s\n" "==============================="
