@@ -1,3 +1,4 @@
+cat > "$HOME/Walleet/package.json" <<'JSON'
 {
   "name": "gestore-spese---nuovo-inizio",
   "private": true,
@@ -32,3 +33,7 @@
     "vite-plugin-pwa": "^1.0.3"
   }
 }
+JSON
+
+# Controllo sintassi JSON con Node
+node -e 'JSON.parse(require("fs").readFileSync("package.json","utf8")); console.log("✅ package.json OK")'
