@@ -85,7 +85,55 @@ export default function Diagnostics() {
     } catch (e) { log('reqSpeechPerm ERR: '+(e?.message||e)); }
   };
 
-  const startSpeechCap = async () => {
+  async function startSpeechCap_it_popup(){
+  try{
+    if (typeof CapSpeech.checkPermissions==='function'){
+      const c=await CapSpeech.checkPermissions();
+      if((c.speechRecognition||c.microphone||c.status)!=='granted'){
+        await CapSpeech.requestPermissions();
+      }
+    }
+    if (startWatchdog.current) clearTimeout(startWatchdog.current);
+    startWatchdog.current=setTimeout(()=>log('⚠️ Nessun evento (it-IT/popup) entro 6s.'),6000);
+    attachListenersIfNeeded();
+    await CapSpeech.start({ language:'it-IT', partialResults:false, popup:true, maxResults:5, continuous:false });
+    log('CapSpeech.start it-IT + popup OK');
+  }catch(e){ log('CapSpeech.start it-IT + popup ERR: '+(e?.message||e)); }
+}
+
+async function startSpeechCap_en_popup(){
+  try{
+    if (typeof CapSpeech.checkPermissions==='function'){
+      const c=await CapSpeech.checkPermissions();
+      if((c.speechRecognition||c.microphone||c.status)!=='granted'){
+        await CapSpeech.requestPermissions();
+      }
+    }
+    if (startWatchdog.current) clearTimeout(startWatchdog.current);
+    startWatchdog.current=setTimeout(()=>log('⚠️ Nessun evento (en-US/popup) entro 6s.'),6000);
+    attachListenersIfNeeded();
+    await CapSpeech.start({ language:'en-US', partialResults:false, popup:true, maxResults:5, continuous:false });
+    log('CapSpeech.start en-US + popup OK');
+  }catch(e){ log('CapSpeech.start en-US + popup ERR: '+(e?.message||e)); }
+}
+
+async function startSpeechCap_default_nopopup(){
+  try{
+    if (typeof CapSpeech.checkPermissions==='function'){
+      const c=await CapSpeech.checkPermissions();
+      if((c.speechRecognition||c.microphone||c.status)!=='granted'){
+        await CapSpeech.requestPermissions();
+      }
+    }
+    if (startWatchdog.current) clearTimeout(startWatchdog.current);
+    startWatchdog.current=setTimeout(()=>log('⚠️ Nessun evento (default/no-popup) entro 6s.'),6000);
+    attachListenersIfNeeded();
+    await CapSpeech.start({ partialResults:true, popup:false, maxResults:5, continuous:true });
+    log('CapSpeech.start default no-popup OK');
+  }catch(e){ log('CapSpeech.start default no-popup ERR: '+(e?.message||e)); }
+}
+
+const startSpeechCap = async () => {
     try {
       attachListenersIfNeeded();
       if (startWatchdog.current) clearTimeout(startWatchdog.current);
@@ -174,6 +222,9 @@ export default function Diagnostics() {
         <button onClick={reqSpeechPerm}>Permesso (Capacitor)</button>
         <button onPointerDown={startSpeechCap} onPointerUp={stopSpeechCap}>🎙️ (Capacitor) Premi e parla</button>
         <button onClick={startSpeechCap}>Avvia (Capacitor)</button>
+<button onClick={startSpeechCap_it_popup}>Avvia it-IT (popup)</button>
+<button onClick={startSpeechCap_en_popup}>Avvia en-US (popup)</button>
+<button onClick={startSpeechCap_default_nopopup}>Avvia default (no popup, continuous)</button>
         <button onClick={stopSpeechCap}>Stop (Capacitor)</button>
 
         {/* Web Speech (shim opzionale) */}
