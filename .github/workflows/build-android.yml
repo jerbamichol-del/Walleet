@@ -25,6 +25,9 @@ jobs:
       - name: Capacitor sync android (include Cordova plugins)
         run: npx cap sync android
 
+      - name: List Capacitor plugins
+        run: npx cap ls
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
