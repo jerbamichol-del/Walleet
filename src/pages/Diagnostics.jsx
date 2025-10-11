@@ -25,7 +25,38 @@ export default function Diagnostics() {
   const [bioType, setBioType] = useState('');
   const [status, setStatus] = useState([]);
 
-  const log = (msg) => setStatus((s) => [String(msg), ...s].slice(0, 80));
+  const log = (msg) => setStatus((s) => [String(msg), ...s].slice(0, 120));
+
+  const getMicGranted = (obj) => {
+    // Capacitor v6/7: { microphone:"granted" } o { status:"granted" }
+    const v = obj || {};
+    const st = v.microphone || v.status || v.state;
+    return st === 'granted';
+  };
+
+  const refreshMicPerm = async () => {
+    try {
+      if (!Capacitor.isPluginAvailable('SpeechRecognition')) {
+        setSpeechPerm(false);
+        return;
+      }
+      if (typeof SpeechRecognition.checkPermissions === 'function') {
+        const res = await SpeechRecognition.checkPermissions();
+        setSpeechPerm(getMicGranted(res));
+        log('Speech.checkPermissions: ' + JSON.stringify(res));
+      } else if (typeof SpeechRecognition.hasPermission === 'function') {
+        const res = await SpeechRecognition.hasPermission();
+        setSpeechPerm(!!res?.permission);
+        log('Speech.hasPermission(legacy): ' + JSON.stringify(res));
+      } else {
+        setSpeechPerm(null);
+        log('Nessuna API permessi disponibile su SpeechRecognition');
+      }
+    } catch (e) {
+      setSpeechPerm(false);
+      log('refreshMicPerm ERR: ' + (e?.message || e));
+    }
+  };
 
   useEffect(() => {
     const pf = Capacitor.getPlatform();
@@ -43,8 +74,7 @@ export default function Diagnostics() {
       if (speechOK) {
         try { const a = await SpeechRecognition.available(); setSpeechAvail(a?.available ?? null); log('Speech.available: ' + JSON.stringify(a)); }
         catch (e) { setSpeechAvail(false); log('Speech.available ERR: ' + (e?.message || e)); }
-        try { const p = await SpeechRecognition.hasPermission(); setSpeechPerm(!!p?.permission); log('Speech.hasPermission: ' + JSON.stringify(p)); }
-        catch (e) { setSpeechPerm(false); log('Speech.hasPermission ERR: ' + (e?.message || e)); }
+        await refreshMicPerm();
       } else {
         log('Plugin SpeechRecognition NON disponibile per Capacitor');
       }
@@ -59,16 +89,37 @@ export default function Diagnostics() {
   }, []);
 
   const reqSpeechPerm = async () => {
-    try { const r = await SpeechRecognition.requestPermission(); setSpeechPerm(!!r?.permission); log('Speech.requestPermission: ' + JSON.stringify(r)); }
-    catch (e) { log('Speech.requestPermission ERR: ' + (e?.message || e)); }
+    try {
+      if (typeof SpeechRecognition.requestPermissions === 'function') {
+        const r = await SpeechRecognition.requestPermissions();
+        setSpeechPerm(getMicGranted(r));
+        log('Speech.requestPermissions: ' + JSON.stringify(r));
+      } else if (typeof SpeechRecognition.requestPermission === 'function') {
+        const r = await SpeechRecognition.requestPermission();
+        setSpeechPerm(!!r?.permission);
+        log('Speech.requestPermission(legacy): ' + JSON.stringify(r));
+      } else {
+        log('API richiesta permessi non disponibile su SpeechRecognition');
+        alert('Richiesta permessi non disponibile su questo plugin/build.');
+      }
+    } catch (e) {
+      log('reqSpeechPerm ERR: ' + (e?.message || e));
+      alert('Permesso microfono: ' + (e?.message || e));
+    }
   };
 
   const startSpeech = async () => {
     try {
+      if (speechPerm !== true) {
+        await reqSpeechPerm();
+        if (speechPerm !== true) return;
+      }
       await SpeechRecognition.start({ language: 'it-IT', partialResults: true, popup: false, maxResults: 1 });
       log('Speech.start OK');
-      SpeechRecognition.addListener('partialResults', (r) => setSpeechLast(r?.matches?.[0] || ''));
-      SpeechRecognition.addListener('result', (r) => setSpeechLast(r?.matches?.[0] || ''));
+      const onPartial = (r) => setSpeechLast(r?.matches?.[0] || '');
+      const onResult  = (r) => setSpeechLast(r?.matches?.[0] || '');
+      SpeechRecognition.addListener('partialResults', onPartial);
+      SpeechRecognition.addListener('result', onResult);
     } catch (e) {
       log('Speech.start ERR: ' + (e?.message || e));
       alert('Speech ERR: ' + (e?.message || e));
@@ -90,8 +141,12 @@ export default function Diagnostics() {
         useFallback: true,
         allowDeviceCredential: true,
       });
-      log('Biometric.verifyIdentity: ' + JSON.stringify(res));
-      alert(res?.verified ? '✅ Autenticazione riuscita' : '❌ Non verificato/annullato');
+      log('Biometric.verifyIdentity RES: ' + JSON.stringify(res));
+      if (res && res.verified) {
+        alert('✅ Autenticazione riuscita');
+      } else {
+        alert('❌ Non verificato (res: ' + JSON.stringify(res) + ')');
+      }
     } catch (e) {
       log('Biometric.verifyIdentity ERR: ' + (e?.message || e));
       alert('❌ Biometria ERR: ' + (e?.message || e));
@@ -124,7 +179,7 @@ export default function Diagnostics() {
       </div>
 
       <h3 style={{ marginTop: 12 }}>Log</h3>
-      <pre style={{ background: '#0b1020', color: '#cbd5e1', padding: 12, borderRadius: 8, maxHeight: 240, overflow: 'auto' }}>
+      <pre style={{ background: '#0b1020', color: '#cbd5e1', padding: 12, borderRadius: 8, maxHeight: 280, overflow: 'auto' }}>
 {status.map((l) => `• ${l}\n`)}
       </pre>
     </div>
