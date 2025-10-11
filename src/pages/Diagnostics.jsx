@@ -25,6 +25,7 @@ export default function Diagnostics() {
   const [bioType, setBioType] = useState('');
   const [langs, setLangs] = useState([]);
   const [status, setStatus] = useState([]);
+  const [cordovaReady, setCordovaReady] = useState(false);
 
   const listenerRefs = useRef({ partial: null, result: null, error: null });
   const startWatchdog = useRef(null);
@@ -32,6 +33,13 @@ export default function Diagnostics() {
   const cordovaOK = !!(typeof window !== 'undefined' && window.cordova && window.cordova.plugins && window.cordova.plugins.speechRecognition);
 
   const log = (msg) => setStatus((s) => [String(msg), ...s].slice(0, 150));
+
+  function hasCordovaSpeech(){
+    return typeof window !== 'undefined'
+      && window.cordova
+      && window.cordova.plugins
+      && window.cordova.plugins.speechRecognition;
+  }
 
   const getMicGranted = (obj) => {
     const v = obj || {};
@@ -64,6 +72,16 @@ export default function Diagnostics() {
   };
 
   useEffect(() => {
+    const onDeviceReady = () => {
+      setCordovaReady(true);
+      if (hasCordovaSpeech()) {
+        log('Cordova driver: disponibile (cordova-plugin-speechrecognition) [deviceready]');
+      } else {
+        log('Cordova driver: NON disponibile [deviceready]');
+      }
+    };
+    document.addEventListener('deviceready', onDeviceReady, false);
+
     const pf = Capacitor.getPlatform();
     setPlatform(pf);
 
@@ -93,14 +111,12 @@ export default function Diagnostics() {
         log('Plugin NativeBiometric NON disponibile per Capacitor');
       }
 
-      if (cordovaOK) {
-        log('Cordova driver: disponibile (cordova-plugin-speechrecognition)');
-      } else {
-        log('Cordova driver: NON disponibile (cordova-plugin-speechrecognition non caricato)');
-      }
+      if (hasCordovaSpeech()) { log('Cordova driver: disponibile (cordova-plugin-speechrecognition)'); } else { log('Cordova driver: NON disponibile (cordova-plugin-speechrecognition non caricato)'); }
     })();
 
     return () => {
+      document.removeEventListener('deviceready', onDeviceReady, false);
+
       try { CapSpeech.removeAllListeners?.(); } catch {}
       if (startWatchdog.current) { clearTimeout(startWatchdog.current); startWatchdog.current = null; }
     };
@@ -182,7 +198,7 @@ export default function Diagnostics() {
   };
 
   // ===== DRIVER CORDOVA =====
-  const reqCordovaPerm = async () => {
+  const reqCordovaPerm = async () => { if (!hasCordovaSpeech()) return log('Cordova driver non disponibile');
     if (!cordovaOK) return log('Cordova driver non disponibile');
     try {
       const has = await window.cordova.plugins.speechRecognition.hasPermission();
@@ -196,7 +212,7 @@ export default function Diagnostics() {
     }
   };
 
-  const startSpeechCordova = async () => {
+  const startSpeechCordova = async () => { if (!hasCordovaSpeech()) return log('Cordova driver non disponibile');
     if (!cordovaOK) return log('Cordova driver non disponibile');
     try {
       const has = await window.cordova.plugins.speechRecognition.hasPermission();
@@ -225,7 +241,7 @@ export default function Diagnostics() {
     }
   };
 
-  const stopSpeechCordova = async () => {
+  const stopSpeechCordova = async () => { if (!hasCordovaSpeech()) return;
     if (!cordovaOK) return;
     try { await window.cordova.plugins.speechRecognition.stopListening(); log('Cordova.stopListening OK'); }
     catch (e) { log('Cordova.stopListening ERR: ' + (e?.message || e)); }
