@@ -2,9 +2,9 @@ name: Android Debug Build
 
 on:
   push:
-    branches: [ "main", "feat/**", "fix/**" ]
+    branches: ["main", "feat/**", "fix/**"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
   workflow_dispatch:
 
 jobs:
@@ -26,7 +26,7 @@ jobs:
       - name: Install deps (npm ci)
         run: npm ci
 
-      # ✅ Usa gli asset legacy e inietta gli shim dal repo
+      # ✅ Usa gli asset legacy e inietta SOLO gli shim necessari
       - name: Prepare web assets (LEGACY + inject shims)
         shell: bash
         run: |
@@ -37,38 +37,16 @@ jobs:
             mkdir -p www
             cp -a legacy_www_final/* www/
 
-            # biometrico OBBLIGATORIO
-            if [[ -f tools/shim-biometric.js ]]; then
-              cp tools/shim-biometric.js www/shim-biometric.js
-              perl -0777 -pe 's#</body>#  <script type="module" src="./shim-biometric.js"></script>\n</body>#igs' -i www/index.html || true
-            else
-              echo "ERROR: tools/shim-biometric.js non trovato."
-              exit 1
-            fi
+            # biometrico (OBBLIGATORIO)
+            cp tools/shim-biometric.js www/shim-biometric.js
 
-            # speech-permission (OPZIONALE)
-            if [[ -f tools/speech-permission-shim.js ]]; then
-              cp tools/speech-permission-shim.js www/speech-permission-shim.js
-              perl -0777 -pe 's#</body>#  <script type="module" src="./speech-permission-shim.js"></script>\n</body>#igs' -i www/index.html || true
-            else
-              echo "INFO: tools/speech-permission-shim.js non presente (ok)."
-            fi
-
-            # speech-plugin (OPZIONALE: sostituisce getUserMedia con popup nativo)
+            # voice (OPZIONALE: se presente)
             if [[ -f tools/speech-plugin-shim.js ]]; then
               cp tools/speech-plugin-shim.js www/speech-plugin-shim.js
-              perl -0777 -pe 's#</body>#  <script type="module" src="./speech-plugin-shim.js"></script>\n</body>#igs' -i www/index.html || true
-            else
-              echo "INFO: tools/speech-plugin-shim.js non presente (ok)."
             fi
 
-            # settings (OPZIONALE: toggle biometria ⚙️)
-            if [[ -f tools/settings-shim.js ]]; then
-              cp tools/settings-shim.js www/settings-shim.js
-              perl -0777 -pe 's#</body>#  <script type="module" src="./settings-shim.js"></script>\n</body>#igs' -i www/index.html || true
-            else
-              echo "INFO: tools/settings-shim.js non presente (ok)."
-            fi
+            # Inietta gli script prima di </body> con cache-busting
+            perl -0777 -pe 's#</body>#  <script type="module" src="./shim-biometric.js?v=${ENV{GITHUB_RUN_NUMBER}//0}"></script>\n  <script type="module" src="./speech-plugin-shim.js?v=${ENV{GITHUB_RUN_NUMBER}//0}"></script>\n</body>#igs' -i www/index.html || true
           else
             echo "legacy_www_final non trovato: build con Vite"
             npm run build

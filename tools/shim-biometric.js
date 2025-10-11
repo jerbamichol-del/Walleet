@@ -1,110 +1,118 @@
-// Shim biometria: AuthGate + prompt + wiring su "Abilita Impronta"
-// - Salva il flag in Capacitor Preferences (fallback localStorage)
-// - Prompt automatico all'apertura se abilitato
-(function () {
-  const KEY = 'biometricsEnabled';
-  let cooldown = false;
+// tools/shim-biometric.js — PROD + SKIP-PIN
+// - intercetta "Abilita Impronta" e sblocchi automatici
+// - se la biometria va a buon fine, nasconde il gate PIN legacy (niente doppio step)
 
-  function getCapacitor() {
-    return (window).Capacitor || null;
+(function () {
+  // === CONFIG ===
+  const LS_ENABLED = 'biometricsEnabled';        // chiave: biometria abilitata dall'utente
+  const LS_UNLOCKED_AT = 'bio.unlockedAt';       // timestamp ultimo sblocco biometrico
+  const UNLOCK_WINDOW_MS = 45 * 1000;            // tempo entro cui "skippare" PIN dopo sblocco
+
+  // testi che identificano schermate/overlay PIN
+  const PIN_MATCHERS = [
+    /crea un pin/i, /inserisci.*pin/i, /conferma.*pin/i, /\bpin\b/i, /accesso veloce/i,
+    /benvenuto!/i, /proteggiamo le tue spese/i
+  ];
+
+  function now(){ return Date.now(); }
+  function setLS(k, v){ try{ localStorage.setItem(k, String(v)); }catch{} }
+  function getLS(k){ try{ return localStorage.getItem(k); }catch{ return null; } }
+  function enabled(){ return getLS(LS_ENABLED) === 'true'; }
+  function markUnlocked(){ setLS(LS_UNLOCKED_AT, String(now())); }
+  function recentlyUnlocked(){
+    const t = Number(getLS(LS_UNLOCKED_AT) || '0');
+    return Number.isFinite(t) && (now() - t) < UNLOCK_WINDOW_MS;
   }
-  function getPlugins() {
-    const cap = getCapacitor();
-    return cap ? (cap.Plugins || {}) : {};
-  }
-  function getNB() {
-    const P = getPlugins();
+
+  function getPlugin(){
+    const cap = (window).Capacitor || {};
+    const P = cap.Plugins || {};
     return (window).NativeBiometric || P.NativeBiometric || P.CapacitorNativeBiometric || P.CapgoNativeBiometric || null;
   }
-  function getPrefs() {
-    const P = getPlugins();
-    return P.Preferences || null;
-  }
 
-  async function setEnabled(v) {
-    try {
-      const Prefs = getPrefs();
-      if (Prefs) {
-        await Prefs.set({ key: KEY, value: String(!!v) });
-      } else {
-        localStorage.setItem(KEY, String(!!v));
-      }
-    } catch { try { localStorage.setItem(KEY, String(!!v)); } catch {} }
-  }
-
-  async function isEnabled() {
-    try {
-      const Prefs = getPrefs();
-      if (Prefs) {
-        const { value } = await Prefs.get({ key: KEY });
-        return value === 'true';
-      }
-      return localStorage.getItem(KEY) === 'true';
-    } catch { return localStorage.getItem(KEY) === 'true'; }
-  }
-
-  async function prompt(reason) {
-    const NB = getNB();
-    if (!NB) return false;
-    if (cooldown) return false;
-    cooldown = true;
-    setTimeout(() => (cooldown = false), 1200);
-    try {
+  async function promptBiometric(reason){
+    const NB = getPlugin();
+    if(!NB) return false;
+    try{
       await NB.verifyIdentity({
-        reason: reason || 'Conferma identità',
+        reason: reason || 'Sblocca Walleet',
         title: 'Autenticazione',
         subtitle: 'Conferma identità',
-        description: 'Usa impronta/volto o PIN',
+        description: 'Usa impronta/volto o PIN dispositivo',
         useFallback: true,
-        android: { deviceCredentialAllowed: true, confirmationRequired: true },
+        android: { deviceCredentialAllowed: true, confirmationRequired: false }
       });
+      markUnlocked();
+      // prova subito a chiudere eventuali overlay
+      killPinOverlays();
       return true;
-    } catch {
+    }catch(e){
       return false;
     }
   }
 
-  function hookButtons() {
-    // aggancia il bottone "Abilita Impronta" dell’onboarding legacy
-    const candidates = document.querySelectorAll('button, [role="button"]');
-    candidates.forEach((el) => {
-      const txt = (el.textContent || '').trim().toLowerCase();
-      if (!el.__bioHooked && /abilita\s+impronta/.test(txt)) {
-        el.__bioHooked = true;
-        el.addEventListener('click', async () => {
-          // lascia la navigazione UI com’è, ma in parallelo chiedi conferma
-          setTimeout(async () => {
-            const ok = await prompt('Abilita accesso veloce');
-            if (ok) await setEnabled(true);
-          }, 0);
-        }, { passive: true });
+  // Nasconde/chiude schermate PIN/Onboarding quando la biometria è ok
+  let killing = false;
+  function killPinOverlays(){
+    if(!recentlyUnlocked() || killing) return false;
+    const roots = document.querySelectorAll('[role="dialog"], .modal, [class*="modal"], .fixed, .inset-0, body > div');
+    let killed = false;
+    roots.forEach(el=>{
+      const txt = (el.textContent || '').toLowerCase();
+      if(PIN_MATCHERS.some(re => re.test(txt))){
+        // prova prima a cliccare eventuale chiudi/salta
+        const btn = el.querySelector('button, [role="button"]');
+        if(btn){
+          killing = true;
+          try { btn.click(); } catch {}
+          setTimeout(()=> killing = false, 500);
+        }
+        // nascondi forzatamente
+        el.style.setProperty('display','none','important');
+        el.style.setProperty('visibility','hidden','important');
+        el.setAttribute('aria-hidden','true');
+        killed = true;
+      }
+    });
+    return killed;
+  }
+
+  // Hook dei bottoni "Abilita Impronta"
+  function hookEnableButtons(){
+    const nodes = document.querySelectorAll('button,[role="button"],.btn');
+    nodes.forEach(el=>{
+      if(el.__bioHook) return;
+      const txt = ((el.textContent||'') + ' ' + (el.getAttribute?.('aria-label')||'')).toLowerCase();
+      if(/abilita\s+impronta/.test(txt)){
+        el.__bioHook = true;
+        el.addEventListener('click', ()=> {
+          setTimeout(()=> promptBiometric('Abilita accesso veloce'), 0);
+          setLS(LS_ENABLED, 'true');
+        }, {passive:true});
       }
     });
   }
 
-  async function autoPromptIfEnabled() {
-    try {
-      if (await isEnabled()) {
-        await prompt('Sblocca Walleet');
-      }
-    } catch {}
+  // Auto-prompt se l’utente ha abilitato biometria
+  function autoPromptOnResume(){
+    if(!enabled()) return;
+    // all’avvio / ritorno in foreground
+    promptBiometric('Sblocca Walleet');
   }
 
-  document.addEventListener('DOMContentLoaded', () => {
-    hookButtons();
-    autoPromptIfEnabled();
+  // Observer: appena compaiono schermate PIN → rimuovile se sbloccato
+  const mo = new MutationObserver(()=>{
+    hookEnableButtons();
+    if(recentlyUnlocked()) killPinOverlays();
+  });
+  mo.observe(document.documentElement, {subtree:true, childList:true});
+
+  document.addEventListener('visibilitychange', ()=>{
+    if(!document.hidden) autoPromptOnResume();
+  });
+  document.addEventListener('DOMContentLoaded', ()=>{
+    hookEnableButtons();
+    if(enabled()) promptBiometric('Sblocca Walleet');
   });
 
-  // Se la UI cambia dinamicamente (React minificato), ri-aggancia
-  const mo = new MutationObserver(hookButtons);
-  mo.observe(document.documentElement, { subtree: true, childList: true });
-  setInterval(hookButtons, 1000);
-
-  // Quando torni in foreground, riprova prompt se abilitato
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) autoPromptIfEnabled();
-  });
-
-  // Esporta helpers per lo settings-shim
-  (window).__bioShim = { setEnabled, isEnabled, prompt };
 })();
