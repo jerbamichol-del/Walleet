@@ -276,6 +276,34 @@ const startSpeechCap = async () => {
         <button onClick={testBiometric}>🔒 Prova autenticazione</button>
       </div>
 
+      
+      <h3 style={{marginTop:12}}>Dettatura via tastiera (Gboard)</h3>
+      <p style={{fontSize:12,opacity:0.8}}>
+        Tocca il campo qui sotto, poi premi il 🎤 sulla tastiera (Gboard). Il testo verrà incollato direttamente.
+      </p>
+      <div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
+        <input
+          id="dictationInput"
+          type="text"
+          placeholder="Tocca qui e usa il microfono della tastiera"
+          onChange={(e)=>{ setSpeechLast(e.target.value); log('Gboard input: '+e.target.value); }}
+          style={{flex:'1 1 320px', padding:'10px 12px', fontSize:16, border:'1px solid #ccc', borderRadius:8}}
+        />
+        <button onClick={()=>{
+          try {
+            const el = document.getElementById('dictationInput');
+            if (el) { el.focus(); log('Focus sul campo: apri tastiera e premi 🎤'); }
+          } catch(e) { log('focus err: '+(e?.message||e)); }
+        }}>Metti a fuoco (apri tastiera)</button>
+        <button onClick={()=>{
+          try {
+            const el = document.getElementById('dictationInput');
+            if (el) { el.value=''; setSpeechLast(''); log('Pulito campo Gboard'); el.focus(); }
+          } catch(e) { log('clear err: '+(e?.message||e)); }
+        }}>Pulisci</button>
+      </div>
+
+
       <h3 style={{ marginTop: 12 }}>Log</h3>
       <pre style={{ background: '#0b1020', color: '#cbd5e1', padding: 12, borderRadius: 8, maxHeight: 340, overflow: 'auto' }}>
 {status.map((l) => `• ${l}\n`)}
