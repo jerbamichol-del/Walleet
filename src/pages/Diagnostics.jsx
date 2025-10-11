@@ -130,7 +130,7 @@ export default function Diagnostics() {
         const handler = () => { log('deviceready fired'); setCordovaReady(true); resolve(); document.removeEventListener('deviceready', handler, false); };
         document.addEventListener('deviceready', handler, false);
         // Se era già arrivato
-        setTimeout(()=>{ if ((typeof window!=='undefined' (window as any).cordova(window as any).cordova window.cordova)) { log('deviceready forse già passato: '+JSON.stringify(cordovaState())); resolve(); } }, 1200);
+          setTimeout(()=>{ if (typeof window !== 'undefined' && window.cordova) { log('deviceready forse già passato: '+JSON.stringify(cordovaState())); resolve(); } }, 1200);
       });
       // Rileggi stato
       log('Post-deviceready cordovaState: '+JSON.stringify(cordovaState()));
