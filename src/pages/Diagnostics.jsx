@@ -114,7 +114,32 @@ export default function Diagnostics() {
       if (hasCordovaSpeech()) { log('Cordova driver: disponibile (cordova-plugin-speechrecognition)'); } else { log('Cordova driver: NON disponibile (cordova-plugin-speechrecognition non caricato)'); }
     })();
 
-    return () => {
+      async function injectCordovaJs(){
+    try{
+      if (window.cordova) { log('cordova.js già disponibile: '+JSON.stringify(cordovaState())); setCordovaLoaded(true); return; }
+      // Evita doppio script
+      if (!document.querySelector('script[src="cordova.js"]')){
+        const sc = document.createElement('script');
+        sc.src = 'cordova.js';
+        sc.onload = () => { log('cordova.js caricato'); setCordovaLoaded(true); };
+        sc.onerror = () => { log('cordova.js NON trovato (404)'); };
+        document.head.appendChild(sc);
+      }
+      // Attendi deviceready
+      await new Promise((resolve)=>{
+        const handler = () => { log('deviceready fired'); setCordovaReady(true); resolve(); document.removeEventListener('deviceready', handler, false); };
+        document.addEventListener('deviceready', handler, false);
+        // Se era già arrivato
+        setTimeout(()=>{ if ((window as any).cordova) { log('deviceready forse già passato: '+JSON.stringify(cordovaState())); resolve(); } }, 1200);
+      });
+      // Rileggi stato
+      log('Post-deviceready cordovaState: '+JSON.stringify(cordovaState()));
+      if (hasCordovaSpeech()) log('Cordova driver: disponibile (post-inject)');
+      else log('Cordova driver: NON disponibile (post-inject)');
+    } catch(e){ log('injectCordovaJs ERR: '+(e?.message||e)); }
+  }
+
+  return () => {
       document.removeEventListener('deviceready', onDeviceReady, false);
 
       try { CapSpeech.removeAllListeners?.(); } catch {}
@@ -284,8 +309,10 @@ export default function Diagnostics() {
 
       <div>available(): <Tag ok={speechAvail} label={String(speechAvail)} /></div>
       <div>hasPermission(): <Tag ok={speechPerm} label={String(speechPerm)} /></div>
+<div style={{fontSize:12,opacity:0.8}}>cordovaReady: <code>{String(cordovaReady)}</code>, cordovaLoaded: <code>{String(cordovaLoaded)}</code></div>
 
       <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button onClick={injectCordovaJs}>Carica cordova.js e attendi deviceready</button>
         {/* Capacitor driver */}
         <button onClick={reqSpeechPerm}>Permesso (Capacitor)</button>
         <button onPointerDown={startSpeechCap} onPointerUp={stopSpeechCap}>🎙️ (Capacitor) Premi e parla</button>
