@@ -21,7 +21,7 @@
             box.textContent=(box.textContent?box.textContent+"\n\n":"")+msg;
           }catch(e){}
         }
-        window.addEventListener("error", function(e){ show("onerror: "+(e.message||e.error||"unknown")); });
+        window.addEventListener("error", function(e){ var info="onerror: "+(e.message||e.error||"unknown"); if(e.filename){ info+="\nfile: "+e.filename+"\nline: "+e.lineno+":"+e.colno; } if(e.error&&e.error.stack){ info+="\nstack: "+e.error.stack; } show("onerror: "+(e.message||e.error||"unknown")); });
         window.addEventListener("unhandledrejection", function(e){ show("unhandledrejection: "+(e.reason&&e.reason.message?e.reason.message:JSON.stringify(e.reason))); });
       })();
     </script>
