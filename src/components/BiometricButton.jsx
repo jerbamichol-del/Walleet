@@ -1,32 +1,35 @@
+cat > src/components/BiometricButton.jsx <<'JSX'
 import React from 'react';
+import { verifyBiometric } from '@/services/biometric';
 import { Capacitor } from '@capacitor/core';
-import { NativeBiometric } from '@capgo/capacitor-native-biometric';
 
 export default function BiometricButton() {
-  const testBiometric = async () => {
+  const onClick = async () => {
+    // Avvia SEMPRE su gesto utente (qui siamo su onClick)
     const platform = Capacitor.getPlatform();
     if (platform !== 'android' && platform !== 'ios') {
-      alert('L’impronta funziona solo sull’APK installato (non in preview web).');
-      return;
+      alert('L’impronta funziona solo su APK installato. In web useremo il simulatore.');
     }
-
     try {
-      const { isAvailable } = await NativeBiometric.isAvailable();
-      if (!isAvailable) {
-        alert('Biometria non disponibile o non configurata.\nRegistra un’impronta/volto nelle impostazioni di sistema.');
-        return;
+      const { verified } = await verifyBiometric({
+        title: 'Sblocca Walleet',
+        subtitle: 'Conferma la tua identità',
+        description: 'Autenticazione biometrica',
+        allowDeviceCredential: true, // PIN/Pattern fallback su Android
+      });
+      if (verified) {
+        alert('✅ Autenticazione riuscita!');
+        // TODO: sblocca qui l’area protetta
       }
-
-      await NativeBiometric.verifyIdentity({ reason: 'Sblocca Walleet' });
-      alert('✅ Autenticazione riuscita!');
     } catch (e) {
       alert('❌ Autenticazione fallita: ' + (e?.message || e));
     }
   };
 
   return (
-    <button onClick={testBiometric} style={{padding:'10px 16px', borderRadius:10}}>
+    <button onClick={onClick} style={{padding:'10px 16px', borderRadius:8}}>
       🔓 Sblocca con impronta
     </button>
   );
 }
+JSX
