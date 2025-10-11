@@ -11,62 +11,88 @@ type Props = {
 };
 
 export default function BiometricButton({ onAuthenticated, auto = false, className, label }: Props) {
+  const [isNative, setIsNative] = useState(false);
   const [available, setAvailable] = useState(false);
   const [biometryType, setBiometryType] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string>('');
+  const [debug, setDebug] = useState<string>('');
 
-  const platform = Capacitor.getPlatform();
-  const isNative = platform === 'android' || platform === 'ios';
+  useEffect(() => {
+    const p = Capacitor.getPlatform();
+    setIsNative(p === 'android' || p === 'ios');
+  }, []);
 
   const probe = useCallback(async () => {
     setMessage('');
+    setDebug(d => d + '\n[probe] start');
     if (!isNative) {
       setAvailable(false);
       setMessage('Biometria non supportata su web.');
+      setDebug(d => d + '\n[probe] not native');
       return;
     }
     try {
-      const res = await NativeBiometric.isAvailable();
-      const ok = !!(res as any)?.isAvailable;
+      const res: any = await NativeBiometric.isAvailable();
+      const ok = !!res?.isAvailable;
       setAvailable(ok);
-      setBiometryType((res as any)?.biometryType ?? null);
+      setBiometryType(res?.biometryType ?? null);
+      setDebug(d => d + `\n[probe] isAvailable=${ok} type=${res?.biometryType ?? 'null'}`);
       if (!ok) {
-        // Importante: anche se non ci sono impronte, permettiamo il click per usare il fallback PIN
-        setMessage('Nessuna impronta/volto configurati. Userò il PIN come fallback.');
+        setMessage('Biometria non configurata. Puoi usare il PIN come fallback o aprire Impostazioni.');
       }
     } catch (err: any) {
       setAvailable(false);
       setMessage(`Impossibile verificare la biometria: ${err?.message || String(err)}`);
+      setDebug(d => d + `\n[probe] error=${err?.message || String(err)}`);
     }
   }, [isNative]);
 
   const doAuth = useCallback(async () => {
+    if (!isNative) return;
     setMessage('');
     setBusy(true);
+    setDebug(d => d + '\n[auth] start');
+
     try {
-      await NativeBiometric.verifyIdentity({
+      // Tentativo 1: prompt con biometria se presente + PIN come fallback
+      await (NativeBiometric as any).verifyIdentity({
         reason: 'Autentica per sbloccare Walleet',
         title: 'Autenticazione',
         subtitle: 'Conferma identità',
         description: 'Usa impronta/volto o PIN',
-        // 👉 consenti PIN/password come fallback quando non ci sono biometrie
-        useFallback: true,
-      } as any);
+        useFallback: true, // fallback generico
+        android: {
+          // forza esplicitamente il device credential (PIN/Pattern/Password)
+          deviceCredentialAllowed: true,
+          confirmationRequired: true,
+        },
+      });
       setBusy(false);
       setMessage('Autenticazione riuscita ✅');
+      setDebug(d => d + '\n[auth] success');
       onAuthenticated?.();
+      return;
     } catch (err: any) {
-      setBusy(false);
       const code = (err?.code || err?.message || 'unknown') + '';
-      let human = 'Autenticazione annullata o non riuscita.';
+      setDebug(d => d + `\n[auth] fail=${code}`);
+      // Tentativo 2: se dice notEnrolled/notAvailable, prova ad aprire le impostazioni di sicurezza
       const s = code.toLowerCase();
-      if (s.includes('notenrolled')) human = 'Nessuna impronta/volto registrati: resta il PIN come fallback.';
+      let human = 'Autenticazione annullata o non riuscita.';
+      if (s.includes('notenrolled')) human = 'Nessuna impronta/volto registrati: puoi usare il PIN o configurare la biometria.';
       if (s.includes('notavailable') || s.includes('nohardware')) human = 'Biometria non disponibile su questo dispositivo.';
       if (s.includes('lockout')) human = 'Troppi tentativi: attendi e riprova.';
       setMessage(`${human} (${code})`);
+
+      // Se il device ha solo PIN attivo, alcuni device mostrano direttamente la schermata lock.
+      // Offriamo anche un link per aprire le impostazioni di sicurezza.
+      try {
+        (NativeBiometric as any).openSettings?.();
+      } catch {}
+    } finally {
+      setBusy(false);
     }
-  }, [onAuthenticated]);
+  }, [isNative, onAuthenticated]);
 
   useEffect(() => { probe(); }, [probe]);
 
@@ -75,7 +101,7 @@ export default function BiometricButton({ onAuthenticated, auto = false, classNa
   }, [auto, isNative, doAuth]);
 
   const text = label || (biometryType ? `Sblocca (${biometryType})` : 'Sblocca con biometria/PIN');
-  // ❗ Non disabilitare più il bottone quando available=false: lasciamo usare il PIN fallback
+  // Non disabilitiamo quando available=false: lasciamo usare PIN fallback
   const disabled = !isNative || busy;
 
   return (
@@ -88,7 +114,22 @@ export default function BiometricButton({ onAuthenticated, auto = false, classNa
       >
         {busy ? 'Verifico…' : text}
       </button>
+
       {message ? <small style={{ color: '#555' }}>{message}</small> : null}
+
+      {/* Pulsantino per aprire le impostazioni di sicurezza se non c'è biometria */}
+      {!available && isNative && (
+        <button
+          type="button"
+          onClick={() => (NativeBiometric as any).openSettings?.()}
+          style={{ justifySelf: 'start', padding: '6px 10px', borderRadius: 8, border: '1px dashed #aaa', background: '#fafafa' }}
+        >
+          Apri Impostazioni di sicurezza
+        </button>
+      )}
+
+      {/* Debug visibile (temporaneo) */}
+      <pre style={{ fontSize: 10, color: '#888', whiteSpace: 'pre-wrap', margin: 0 }}>{debug.trim()}</pre>
     </div>
   );
 }
