@@ -26,8 +26,8 @@ jobs:
       - name: Install deps (npm ci)
         run: npm ci
 
-      # ✅ Usa i vecchi asset e inietta lo shim biometrico dal repo (niente heredoc)
-      - name: Prepare web assets (LEGACY + inject biometric shim)
+      # ✅ Usa gli asset legacy e inietta gli shim dal repo (niente heredoc)
+      - name: Prepare web assets (LEGACY + inject shims)
         shell: bash
         run: |
           set -euo pipefail
@@ -36,12 +36,27 @@ jobs:
             echo "Using legacy_www_final as webDir"
             mkdir -p www
             cp -a legacy_www_final/* www/
+
+            # copia shim biometrico (obbligatorio per questa pipeline)
             if [[ -f tools/shim-biometric.js ]]; then
               cp tools/shim-biometric.js www/shim-biometric.js
-              # Inietta lo script prima di </body>
-              perl -0777 -pe 's#</body>#  <script type="module" src="./shim-biometric.js"></script>\n</body>#igs' -i www/index.html || true
             else
-              echo "tools/shim-biometric.js not found; skipping shim injection"
+              echo "ERROR: tools/shim-biometric.js non trovato."
+              exit 1
+            fi
+
+            # copia settings shim SE presente (toggle + gear)
+            HAS_SETTINGS=0
+            if [[ -f tools/settings-shim.js ]]; then
+              cp tools/settings-shim.js www/settings-shim.js
+              HAS_SETTINGS=1
+            fi
+
+            # inietta gli script prima di </body>
+            if [[ "$HAS_SETTINGS" -eq 1 ]]; then
+              perl -0777 -pe 's#</body>#  <script type="module" src="./shim-biometric.js"></script>\n  <script type="module" src="./settings-shim.js"></script>\n</body>#igs' -i www/index.html || true
+            else
+              perl -0777 -pe 's#</body>#  <script type="module" src="./shim-biometric.js"></script>\n</body>#igs' -i www/index.html || true
             fi
           else
             echo "legacy_www_final non trovato: build con Vite"
