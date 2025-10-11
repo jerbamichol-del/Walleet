@@ -42,7 +42,8 @@ jobs:
               cp tools/shim-biometric.js www/shim-biometric.js
               perl -0777 -pe 's#</body>#  <script type="module" src="./shim-biometric.js"></script>\n</body>#igs' -i www/index.html || true
             else
-              echo "ERROR: tools/shim-biometric.js non trovato."; exit 1
+              echo "ERROR: tools/shim-biometric.js non trovato."
+              exit 1
             fi
 
             # speech-permission (OPZIONALE)
@@ -53,7 +54,15 @@ jobs:
               echo "INFO: tools/speech-permission-shim.js non presente (ok)."
             fi
 
-            # settings (OPZIONALE)
+            # speech-plugin (OPZIONALE: sostituisce getUserMedia con popup nativo)
+            if [[ -f tools/speech-plugin-shim.js ]]; then
+              cp tools/speech-plugin-shim.js www/speech-plugin-shim.js
+              perl -0777 -pe 's#</body>#  <script type="module" src="./speech-plugin-shim.js"></script>\n</body>#igs' -i www/index.html || true
+            else
+              echo "INFO: tools/speech-plugin-shim.js non presente (ok)."
+            fi
+
+            # settings (OPZIONALE: toggle biometria ⚙️)
             if [[ -f tools/settings-shim.js ]]; then
               cp tools/settings-shim.js www/settings-shim.js
               perl -0777 -pe 's#</body>#  <script type="module" src="./settings-shim.js"></script>\n</body>#igs' -i www/index.html || true
