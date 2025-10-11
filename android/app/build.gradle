@@ -27,6 +27,8 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
         debug {
+        applicationIdSuffix ".diag"
+        versionNameSuffix "-diag"
             // usa la debug.keystore di default (~/.android/debug.keystore)
         }
     }

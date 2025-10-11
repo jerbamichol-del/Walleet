@@ -1,97 +1,34 @@
-name: Android Debug Build
-
+name: Android Debug APK
 on:
   push:
-    branches: ["main", "feat/**", "fix/**"]
-  pull_request:
-    branches: ["main"]
-  workflow_dispatch:
-
+    branches: [ feat/biometrics ]
+  workflow_dispatch: {}
 jobs:
-  build-android-debug:
-    runs-on: ubuntu-24.04
-
+  build:
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Setup Node.js
+      - uses: actions/checkout@v4
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
-          cache: "npm"
-
-      - name: Install deps (npm ci)
-        run: npm ci
-
-      # ✅ Usa gli asset legacy e inietta SOLO gli shim necessari
-      - name: Prepare web assets (LEGACY + inject shims)
-        shell: bash
+          node-version: '22'
+      - name: Install deps & build web
         run: |
-          set -euo pipefail
-          rm -rf www
-          if [[ -f legacy_www_final/index.html ]]; then
-            echo "Using legacy_www_final as webDir"
-            mkdir -p www
-            cp -a legacy_www_final/* www/
-
-            # biometrico (OBBLIGATORIO)
-            cp tools/shim-biometric.js www/shim-biometric.js
-
-            # voice (OPZIONALE: se presente)
-            if [[ -f tools/speech-plugin-shim.js ]]; then
-              cp tools/speech-plugin-shim.js www/speech-plugin-shim.js
-            fi
-
-            # Inietta gli script prima di </body> con cache-busting
-            perl -0777 -pe 's#</body>#  <script type="module" src="./shim-biometric.js?v=${ENV{GITHUB_RUN_NUMBER}//0}"></script>\n  <script type="module" src="./speech-plugin-shim.js?v=${ENV{GITHUB_RUN_NUMBER}//0}"></script>\n</body>#igs' -i www/index.html || true
-          else
-            echo "legacy_www_final non trovato: build con Vite"
-            npm run build
-          fi
-
-      - name: Setup Java 21
+          npm ci
+          npm run build
+      - name: Capacitor sync (android)
+        run: npx cap sync android
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: "temurin"
-          java-version: "21"
-          cache: "gradle"
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Accept SDK licenses
-        run: yes | sdkmanager --licenses
-
-      - name: Install SDK packages (API 35)
+          distribution: 'temurin'
+          java-version: '21'
+      - name: Build APK (debug) with bumped version
         run: |
-          sdkmanager --install "platform-tools" "build-tools;35.0.0" "platforms;android-35" || true
-
-      - name: Make gradlew executable
-        run: chmod +x android/gradlew
-
-      - name: Compute version code/name
-        shell: bash
-        run: |
-          RUN_NO="${GITHUB_RUN_NUMBER:-0}"
-          VERSION_CODE=$((100000 + RUN_NO))
-          VERSION_NAME="$(node -p "require('./package.json').version")+${RUN_NO}"
-          {
-            echo "VERSION_CODE=$VERSION_CODE"
-            echo "VERSION_NAME=$VERSION_NAME"
-          } >> "$GITHUB_ENV"
-          echo "Computed VERSION_CODE=$VERSION_CODE"
-          echo "Computed VERSION_NAME=$VERSION_NAME"
-
-      - name: Capacitor sync
-        run: npx cap sync
-
-      - name: Build Debug APK
-        working-directory: android
-        run: ./gradlew assembleDebug --no-daemon -PVERSION_CODE="$VERSION_CODE" -PVERSION_NAME="$VERSION_NAME"
-
+          cd android
+          VERSION_CODE=${{ github.run_number }}
+          VERSION_NAME="test-${{ github.run_number }}"
+          ./gradlew assembleDebug -PVERSION_CODE=$VERSION_CODE -PVERSION_NAME=$VERSION_NAME
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
