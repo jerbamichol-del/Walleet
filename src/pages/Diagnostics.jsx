@@ -28,9 +28,9 @@ export default function Diagnostics() {
   const log = (msg) => setStatus((s) => [String(msg), ...s].slice(0, 120));
 
   const getMicGranted = (obj) => {
-    // Capacitor v6/7: { microphone:"granted" } o { status:"granted" }
+    // Il plugin può restituire: { speechRecognition:"granted" } oppure { status/microphone/state:"granted" }
     const v = obj || {};
-    const st = v.microphone || v.status || v.state;
+    const st = v.speechRecognition || v.microphone || v.status || v.state;
     return st === 'granted';
   };
 
@@ -92,8 +92,15 @@ export default function Diagnostics() {
     try {
       if (typeof SpeechRecognition.requestPermissions === 'function') {
         const r = await SpeechRecognition.requestPermissions();
-        setSpeechPerm(getMicGranted(r));
         log('Speech.requestPermissions: ' + JSON.stringify(r));
+        // dopo la richiesta, ricontrolla
+        const c = await SpeechRecognition.checkPermissions?.();
+        if (c) {
+          setSpeechPerm(getMicGranted(c));
+          log('Speech.checkPermissions (post-request): ' + JSON.stringify(c));
+        } else {
+          setSpeechPerm(getMicGranted(r));
+        }
       } else if (typeof SpeechRecognition.requestPermission === 'function') {
         const r = await SpeechRecognition.requestPermission();
         setSpeechPerm(!!r?.permission);
@@ -110,9 +117,12 @@ export default function Diagnostics() {
 
   const startSpeech = async () => {
     try {
+      // Se ancora non è granted, prova a richiedere ora
       if (speechPerm !== true) {
         await reqSpeechPerm();
-        if (speechPerm !== true) return;
+        // rileggi lo stato attuale
+        const c = await SpeechRecognition.checkPermissions?.();
+        if (c && !getMicGranted(c)) return;
       }
       await SpeechRecognition.start({ language: 'it-IT', partialResults: true, popup: false, maxResults: 1 });
       log('Speech.start OK');
