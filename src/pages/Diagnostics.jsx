@@ -373,6 +373,27 @@ export default function Diagnostics() {
     }
   };
 
+  // ===== WEB SPEECH (SHIM) =====
+  let webRec = null;
+  function startWebSpeech(setLast, log){
+    try{
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if(!SR){ log('WebSpeech: API non disponibile su questo WebView'); alert('Web Speech non disponibile'); return; }
+      webRec = new SR();
+      webRec.lang = 'it-IT';
+      webRec.interimResults = true;
+      webRec.continuous = true;
+      webRec.onresult = (e)=>{ try{ const i=e.resultIndex; const txt=e.results[i][0].transcript; setLast(txt); }catch(_){} };
+      webRec.onerror  = (e)=>{ log('WebSpeech error: '+JSON.stringify(e)); };
+      webRec.onend    = ()=>{ log('WebSpeech end'); };
+      webRec.start();
+      log('WebSpeech start');
+    }catch(e){ log('WebSpeech ERR: '+(e?.message||e)); }
+  }
+  function stopWebSpeech(log){
+    try{ if(webRec){ webRec.stop(); webRec=null; log('WebSpeech stop'); } }catch(e){ log('WebSpeech stop ERR: '+(e?.message||e)); }
+  }
+
   const stopSpeechCordova = async () => {
     if (!hasCordovaSpeech()) return;
     try { await window.cordova.plugins.speechRecognition.stopListening(); log('Cordova.stopListening OK'); }
@@ -431,6 +452,10 @@ export default function Diagnostics() {
         <button onPointerDown={startSpeechCap} onPointerUp={stopSpeechCap}>🎙️ (Capacitor) Premi e parla</button>
         <button onClick={startSpeechCap}>Avvia (Capacitor)</button>
         <button onClick={stopSpeechCap}>Stop (Capacitor)</button>
+
+        {/* Web Speech (shim) */}
+        <button onClick={()=>startWebSpeech(setSpeechLast, log)}>🎤 Web Speech (shim) Avvia</button>
+        <button onClick={()=>stopWebSpeech(log)}>Stop (Web Speech)</button>
 
         {/* Cordova driver */}
         <button onClick={reqCordovaPerm}>Permesso (Cordova)</button>
