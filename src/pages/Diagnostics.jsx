@@ -148,10 +148,7 @@ export default function Diagnostics() {
         }, 1200);
       });
 
-      // prova a montare i plugin js e clobber
-      await ensureCordovaPluginSpeech();
-      const cl = await forceCordovaClobbers();
-      log('Cordova clobber speech: ' + cl);
+      // (manuale) i plugin Cordova si possono caricare dal bottone dedicato.
 
       // rilettura stato
       log('Post-deviceready cordovaState: ' + JSON.stringify(cordovaState()));
@@ -230,7 +227,7 @@ export default function Diagnostics() {
     // auto-inject cordova.js su Android
     try {
       if (typeof window !== 'undefined' && /android/i.test(navigator.userAgent)) {
-        setTimeout(() => injectCordovaJs(), 300);
+        // (disabilitato) setTimeout(() => injectCordovaJs(), 300);
       }
     } catch (e) { log('auto-inject cordova.js ERR: ' + (e?.message || e)); }
 
@@ -403,6 +400,8 @@ export default function Diagnostics() {
 
       <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button onClick={injectCordovaJs}>Carica cordova.js e attendi deviceready</button>
+<button onClick={async()=>{ await ensureCordovaPluginSpeech(); log('try ensure plugins → '+JSON.stringify(cordovaState())); }}>Carica plugin Cordova (registry)</button>
+<button onClick={async()=>{ const cl = await forceCordovaClobbers(); log('clobber manuale: '+cl+' → '+JSON.stringify(cordovaState())); }}>Clobber manuale Speech</button>
 
         {/* Capacitor driver */}
         <button onClick={reqSpeechPerm}>Permesso (Capacitor)</button>
