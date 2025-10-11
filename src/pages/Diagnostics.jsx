@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { SpeechRecognition } from '@capacitor-community/speech-recognition';
 import { NativeBiometric } from '@capgo/capacitor-native-biometric';
@@ -24,6 +24,9 @@ export default function Diagnostics() {
   const [bioAvail, setBioAvail] = useState(null);
   const [bioType, setBioType] = useState('');
   const [status, setStatus] = useState([]);
+
+  const listenerRefs = useRef({ partial: null, result: null, error: null });
+  const startWatchdog = useRef(null);
 
   const log = (msg) => setStatus((s) => [String(msg), ...s].slice(0, 120));
 
@@ -86,6 +89,12 @@ export default function Diagnostics() {
         log('Plugin NativeBiometric NON disponibile per Capacitor');
       }
     })();
+
+    // pulizia listeners on unmount
+    return () => {
+      try { SpeechRecognition.removeAllListeners(); } catch {}
+      if (startWatchdog.current) { clearTimeout(startWatchdog.current); startWatchdog.current = null; }
+    };
   }, []);
 
   const reqSpeechPerm = async () => {
@@ -93,7 +102,6 @@ export default function Diagnostics() {
       if (typeof SpeechRecognition.requestPermissions === 'function') {
         const r = await SpeechRecognition.requestPermissions();
         log('Speech.requestPermissions: ' + JSON.stringify(r));
-        // dopo la richiesta, ricontrolla
         const c = await SpeechRecognition.checkPermissions?.();
         if (c) {
           setSpeechPerm(getMicGranted(c));
@@ -115,21 +123,57 @@ export default function Diagnostics() {
     }
   };
 
+  const attachListenersIfNeeded = () => {
+    try {
+      if (!listenerRefs.current.partial) {
+        listenerRefs.current.partial = SpeechRecognition.addListener('partialResults', (r) => {
+          console.log('[speech] partial', r);
+          setSpeechLast(r?.matches?.[0] || '');
+        });
+      }
+      if (!listenerRefs.current.result) {
+        listenerRefs.current.result = SpeechRecognition.addListener('result', (r) => {
+          console.log('[speech] result', r);
+          setSpeechLast(r?.matches?.[0] || '');
+        });
+      }
+      if (!listenerRefs.current.error) {
+        listenerRefs.current.error = SpeechRecognition.addListener('error', (e) => {
+          console.error('[speech] error', e);
+          log('Speech error: ' + JSON.stringify(e));
+        });
+      }
+    } catch (e) {
+      log('attachListenersIfNeeded ERR: ' + (e?.message || e));
+    }
+  };
+
   const startSpeech = async () => {
     try {
-      // Se ancora non è granted, prova a richiedere ora
+      // Permessi
       if (speechPerm !== true) {
         await reqSpeechPerm();
-        // rileggi lo stato attuale
         const c = await SpeechRecognition.checkPermissions?.();
         if (c && !getMicGranted(c)) return;
       }
-      await SpeechRecognition.start({ language: 'it-IT', partialResults: true, popup: true, maxResults: 1 });
+
+      // Listener PRIMA dello start
+      attachListenersIfNeeded();
+
+      // Watchdog: se non arrivano eventi entro 6s, avvisa
+      if (startWatchdog.current) clearTimeout(startWatchdog.current);
+      startWatchdog.current = setTimeout(() => {
+        log('⚠️ Nessun evento dal riconoscimento entro 6s (prova popup:true, lingua, servizi Google).');
+      }, 6000);
+
+      await SpeechRecognition.start({
+        language: 'it-IT',
+        partialResults: true,
+        popup: true,       // forziamo il popup nativo
+        maxResults: 5,
+      });
       log('Speech.start OK');
-      const onPartial = (r) => setSpeechLast(r?.matches?.[0] || '');
-      const onResult  = (r) => setSpeechLast(r?.matches?.[0] || '');
-      SpeechRecognition.addListener('partialResults', (r)=>{ console.log('[speech] partial', r); onPartial(r); });
-      SpeechRecognition.addListener('result', (r)=>{ console.log('[speech] result', r); onResult(r); });
+      console.log('[speech] start called');
     } catch (e) {
       log('Speech.start ERR: ' + (e?.message || e));
       alert('Speech ERR: ' + (e?.message || e));
@@ -137,13 +181,21 @@ export default function Diagnostics() {
   };
 
   const stopSpeech = async () => {
-    try { await SpeechRecognition.stop(); SpeechRecognition.removeAllListeners(); log('Speech.stop OK'); }
-    catch (e) { log('Speech.stop ERR: ' + (e?.message || e)); }
+    try {
+      await SpeechRecognition.stop();
+      console.log('[speech] stop called');
+      log('Speech.stop OK');
+      if (startWatchdog.current) { clearTimeout(startWatchdog.current); startWatchdog.current = null; }
+      // NON rimuovo i listener subito: servono per ricevere l'ultimo "result"
+    } catch (e) {
+      log('Speech.stop ERR: ' + (e?.message || e));
+    }
   };
 
   const testBiometric = async () => {
     try {
-      const res = await NativeBiometric.verifyIdentity({
+      // Considera successo se NON lancia eccezioni
+      await NativeBiometric.verifyIdentity({
         reason: 'Sblocca Walleet',
         title: 'Sblocca Walleet',
         subtitle: 'Conferma la tua identità',
@@ -151,12 +203,8 @@ export default function Diagnostics() {
         useFallback: true,
         allowDeviceCredential: true,
       });
-      log('Biometric.verifyIdentity RES: ' + JSON.stringify(res));
-      if (res && res.verified) {
-        alert('✅ Autenticazione riuscita');
-      } else {
-        alert('❌ Non verificato (res: ' + JSON.stringify(res) + ')');
-      }
+      log('Biometric.verifyIdentity OK (nessuna eccezione)');
+      alert('✅ Autenticazione riuscita');
     } catch (e) {
       log('Biometric.verifyIdentity ERR: ' + (e?.message || e));
       alert('❌ Biometria ERR: ' + (e?.message || e));
@@ -177,6 +225,7 @@ export default function Diagnostics() {
       <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button onClick={reqSpeechPerm}>Concedi permesso microfono</button>
         <button onPointerDown={startSpeech} onPointerUp={stopSpeech}>🎙️ Premi e parla</button>
+        <button onClick={startSpeech}>Avvia (tap)</button>
         <button onClick={stopSpeech}>Stop</button>
       </div>
       <div style={{ marginTop: 6 }}>Ultimo riconosciuto: <code>{speechLast}</code></div>
