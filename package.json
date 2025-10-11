@@ -17,6 +17,7 @@
     "@capacitor/android": "^7.4.3",
     "@capacitor/cli": "^7.4.3",
     "@capacitor/core": "^7.4.3",
+    "@capacitor/preferences": "^7.0.2",
     "@capgo/capacitor-native-biometric": "^7.1.13",
     "@google/genai": "^1.21.0",
     "idb": "8",
