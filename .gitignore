@@ -32,3 +32,8 @@ dist-ssr
 
 # import da Walleet-
 _imported_from_minus/
+
+# local snapshots & temps
+_snapshots/
+*.tar.gz
+.wpreview-www.pid
