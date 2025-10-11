@@ -179,6 +179,18 @@ const startSpeechCap = async () => {
   };
 
   useEffect(() => {
+  // Auto-flush risultati quando torniamo in primo piano
+  const onVis = async () => {
+    try {
+      if (document.visibilityState === 'visible') {
+        try { await CapSpeech.stop(); log('auto-stop dopo visibilitychange (flush risultati)'); } catch(e){ log('auto-stop(vis) ERR: '+(e?.message||e)); }
+      }
+    } catch(e) { log('visibilitychange ERR: '+(e?.message||e)); }
+  };
+  document.addEventListener('visibilitychange', onVis);
+
+  // Listener resume già presente tramite App (se c'è)
+
   // Quando si chiude il popup di Google, l'app torna attiva: forza stop() per flush risultati
   const appSub = App.addListener('appStateChange', async (state) => {
     try {
@@ -217,6 +229,8 @@ const startSpeechCap = async () => {
     })();
 
     return () => {
+  try { document.removeEventListener('visibilitychange', onVis); } catch(_){}
+
   try { /* rimuovi listener App */ App.removeAllListeners && App.removeAllListeners(); } catch(_){ }
   _cleanupApp && _cleanupApp();
 
