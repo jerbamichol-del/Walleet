@@ -23,6 +23,7 @@ export default function Diagnostics() {
   const [speechLast, setSpeechLast] = useState('');
   const [bioAvail, setBioAvail] = useState(null);
   const [bioType, setBioType] = useState('');
+  const [langs, setLangs] = useState([]);
   const [status, setStatus] = useState([]);
 
   const listenerRefs = useRef({ partial: null, result: null, error: null });
@@ -78,6 +79,7 @@ export default function Diagnostics() {
         try { const a = await SpeechRecognition.available(); setSpeechAvail(a?.available ?? null); log('Speech.available: ' + JSON.stringify(a)); }
         catch (e) { setSpeechAvail(false); log('Speech.available ERR: ' + (e?.message || e)); }
         await refreshMicPerm();
+        try { const L = await SpeechRecognition.getSupportedLanguages?.(); if (L) { setLangs(L); log('Speech.getSupportedLanguages: '+JSON.stringify(L).slice(0,200)+'...'); } } catch(e) { log('getSupportedLanguages ERR: '+(e?.message||e)); }
       } else {
         log('Plugin SpeechRecognition NON disponibile per Capacitor');
       }
@@ -220,15 +222,24 @@ export default function Diagnostics() {
       <div>Capacitor.isPluginAvailable('NativeBiometric'): <Tag ok={availBioPlugin} label={String(availBioPlugin)} /></div>
 
       <h3 style={{ marginTop: 12 }}>Microfono / Speech</h3>
+<div style={{fontSize:12,opacity:0.85,background:'#11182711',padding:8,borderRadius:8}}>
+<b>Guida debug voce</b><br/>
+1) Aggiorna <b>Google</b> e <b>Speech Services by Google</b> dal Play Store.<br/>
+2) Imposta <b>Impostazioni → App → App predefinite → Inserimento vocale</b> su <b>Google</b> (non quello del produttore).<br/>
+3) In <b>Impostazioni → App → Google → Permessi</b> consenti <b>Microfono</b>.<br/>
+4) Riavvia l'app e riprova.
+</div>
       <div>available(): <Tag ok={speechAvail} label={String(speechAvail)} /></div>
       <div>hasPermission(): <Tag ok={speechPerm} label={String(speechPerm)} /></div>
       <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button onClick={async()=>{ try{ const L=await SpeechRecognition.getSupportedLanguages?.(); if(L){ setLangs(L); log('Self-test: languages '+L.length); } }catch(e){ log('Self-test ERR: '+(e?.message||e)); } }}>Self-test lingue</button>
         <button onClick={reqSpeechPerm}>Concedi permesso microfono</button>
         <button onPointerDown={startSpeech} onPointerUp={stopSpeech}>🎙️ Premi e parla</button>
         <button onClick={startSpeech}>Avvia (tap)</button>
         <button onClick={stopSpeech}>Stop</button>
       </div>
       <div style={{ marginTop: 6 }}>Ultimo riconosciuto: <code>{speechLast}</code></div>
+<div style={{ marginTop: 6, fontSize:12, opacity:0.85 }}>Lingue supportate (sample): <code>{(langs||[]).slice(0,6).join(', ')||'-'}</code></div>
 
       <h3 style={{ marginTop: 12 }}>Biometria</h3>
       <div>isAvailable(): <Tag ok={bioAvail} label={String(bioAvail)} /></div>
