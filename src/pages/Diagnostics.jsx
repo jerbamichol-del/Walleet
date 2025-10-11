@@ -1,4 +1,3 @@
-cat > /data/data/com.termux/files/home/Walleet/src/pages/Diagnostics.jsx <<'JSX'
 import React, { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { SpeechRecognition } from '@capacitor-community/speech-recognition';
@@ -42,36 +41,17 @@ export default function Diagnostics() {
 
     (async () => {
       if (speechOK) {
-        try {
-          const a = await SpeechRecognition.available();
-          setSpeechAvail(a?.available ?? null);
-          log('Speech.available: ' + JSON.stringify(a));
-        } catch (e) {
-          setSpeechAvail(false);
-          log('Speech.available ERR: ' + (e?.message || e));
-        }
-        try {
-          const p = await SpeechRecognition.hasPermission();
-          setSpeechPerm(!!p?.permission);
-          log('Speech.hasPermission: ' + JSON.stringify(p));
-        } catch (e) {
-          setSpeechPerm(false);
-          log('Speech.hasPermission ERR: ' + (e?.message || e));
-        }
+        try { const a = await SpeechRecognition.available(); setSpeechAvail(a?.available ?? null); log('Speech.available: ' + JSON.stringify(a)); }
+        catch (e) { setSpeechAvail(false); log('Speech.available ERR: ' + (e?.message || e)); }
+        try { const p = await SpeechRecognition.hasPermission(); setSpeechPerm(!!p?.permission); log('Speech.hasPermission: ' + JSON.stringify(p)); }
+        catch (e) { setSpeechPerm(false); log('Speech.hasPermission ERR: ' + (e?.message || e)); }
       } else {
         log('Plugin SpeechRecognition NON disponibile per Capacitor');
       }
 
       if (bioOK) {
-        try {
-          const { isAvailable, biometryType } = await NativeBiometric.isAvailable();
-          setBioAvail(!!isAvailable);
-          setBioType(biometryType || '');
-          log('Biometric.isAvailable: ' + JSON.stringify({ isAvailable, biometryType }));
-        } catch (e) {
-          setBioAvail(false);
-          log('Biometric.isAvailable ERR: ' + (e?.message || e));
-        }
+        try { const { isAvailable, biometryType } = await NativeBiometric.isAvailable(); setBioAvail(!!isAvailable); setBioType(biometryType || ''); log('Biometric.isAvailable: ' + JSON.stringify({ isAvailable, biometryType })); }
+        catch (e) { setBioAvail(false); log('Biometric.isAvailable ERR: ' + (e?.message || e)); }
       } else {
         log('Plugin NativeBiometric NON disponibile per Capacitor');
       }
@@ -79,13 +59,8 @@ export default function Diagnostics() {
   }, []);
 
   const reqSpeechPerm = async () => {
-    try {
-      const r = await SpeechRecognition.requestPermission();
-      setSpeechPerm(!!r?.permission);
-      log('Speech.requestPermission: ' + JSON.stringify(r));
-    } catch (e) {
-      log('Speech.requestPermission ERR: ' + (e?.message || e));
-    }
+    try { const r = await SpeechRecognition.requestPermission(); setSpeechPerm(!!r?.permission); log('Speech.requestPermission: ' + JSON.stringify(r)); }
+    catch (e) { log('Speech.requestPermission ERR: ' + (e?.message || e)); }
   };
 
   const startSpeech = async () => {
@@ -101,13 +76,8 @@ export default function Diagnostics() {
   };
 
   const stopSpeech = async () => {
-    try {
-      await SpeechRecognition.stop();
-      SpeechRecognition.removeAllListeners();
-      log('Speech.stop OK');
-    } catch (e) {
-      log('Speech.stop ERR: ' + (e?.message || e));
-    }
+    try { await SpeechRecognition.stop(); SpeechRecognition.removeAllListeners(); log('Speech.stop OK'); }
+    catch (e) { log('Speech.stop ERR: ' + (e?.message || e)); }
   };
 
   const testBiometric = async () => {
@@ -133,12 +103,8 @@ export default function Diagnostics() {
       <h2>Diagnostica Walleet</h2>
 
       <div>Piattaforma: <b>{platform}</b></div>
-      <div>Capacitor.isPluginAvailable('SpeechRecognition'):
-        <Tag ok={availSpeechPlugin} label={String(availSpeechPlugin)} />
-      </div>
-      <div>Capacitor.isPluginAvailable('NativeBiometric'):
-        <Tag ok={availBioPlugin} label={String(availBioPlugin)} />
-      </div>
+      <div>Capacitor.isPluginAvailable('SpeechRecognition'): <Tag ok={availSpeechPlugin} label={String(availSpeechPlugin)} /></div>
+      <div>Capacitor.isPluginAvailable('NativeBiometric'): <Tag ok={availBioPlugin} label={String(availBioPlugin)} /></div>
 
       <h3 style={{ marginTop: 12 }}>Microfono / Speech</h3>
       <div>available(): <Tag ok={speechAvail} label={String(speechAvail)} /></div>
@@ -161,12 +127,6 @@ export default function Diagnostics() {
       <pre style={{ background: '#0b1020', color: '#cbd5e1', padding: 12, borderRadius: 8, maxHeight: 240, overflow: 'auto' }}>
 {status.map((l) => `• ${l}\n`)}
       </pre>
-
-      <p style={{ fontSize: 12, opacity: 0.7 }}>
-        Se Speech dice "false/false", vai su Impostazioni → App → Walleet → Permessi → abilita <b>Microfono</b>.<br />
-        Per la biometria, configura almeno un'impronta o un PIN sul dispositivo.
-      </p>
     </div>
   );
 }
-JSX
