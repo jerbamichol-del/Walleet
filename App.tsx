@@ -1,3 +1,4 @@
+// /data/data/com.termux/files/home/Walleet/App.tsx
 import React, { useState, useMemo, useEffect } from 'react';
 import { Expense } from './types';
 import { useLocalStorage } from './hooks/useLocalStorage';
@@ -18,17 +19,25 @@ import PendingImages from './components/PendingImages';
 import MultipleExpensesModal from './components/MultipleExpensesModal';
 import CategoryDetailScreen from './screens/CategoryDetailScreen';
 
+// 👉 Bottone biometrico per test rapido (nessun gate)
+import BiometricButton from './components/BiometricButton';
+
 interface AppProps {
   onLogout: () => void;
 }
 
 const App: React.FC<AppProps> = ({ onLogout }) => {
+  // Stato principale
   const [expenses, setExpenses] = useLocalStorage<Expense[]>('expenses', []);
   const [view, setView] = useState<'dashboard' | 'categories'>('dashboard');
+
+  // Modali / UI
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isImageParserOpen, setIsImageParserOpen] = useState(false);
   const [isVoiceInputOpen, setIsVoiceInputOpen] = useState(false);
   const [isMultiExpenseModalOpen, setIsMultiExpenseModalOpen] = useState(false);
+
+  // Dati modali
   const [imageParserSource, setImageParserSource] = useState<'camera' | 'screenshot'>('screenshot');
   const [editingExpense, setEditingExpense] = useState<Expense | undefined>(undefined);
   const [prefilledData, setPrefilledData] = useState<Partial<Omit<Expense, 'id'>> | undefined>(undefined);
@@ -36,18 +45,25 @@ const App: React.FC<AppProps> = ({ onLogout }) => {
   const [selectedCategory, setSelectedCategory] = useState<string | 'all'>('all');
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
 
+  // Online / coda immagini
   const isOnline = useOnlineStatus();
   const [queuedImages, setQueuedImages] = useState<OfflineImage[]>([]);
   const [syncingImageId, setSyncingImageId] = useState<string | null>(null);
-  const [toast, setToast] = useState<{message: string, type: 'info' | 'success' | 'error'} | null>(null);
 
+  // Toast
+  const [toast, setToast] = useState<{ message: string; type: 'info' | 'success' | 'error' } | null>(null);
+
+  // Test biometria (solo feedback UI)
+  const [bioOK, setBioOK] = useState(false);
+
+  // Gestione history (view)
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
-        if (!event.state || event.state.view === 'dashboard') {
-            setView('dashboard');
-        } else {
-            setView(event.state.view);
-        }
+      if (!event.state || event.state.view === 'dashboard') {
+        setView('dashboard');
+      } else {
+        setView(event.state.view);
+      }
     };
     window.addEventListener('popstate', handlePopState);
     window.history.replaceState({ view: 'dashboard' }, '');
@@ -58,75 +74,73 @@ const App: React.FC<AppProps> = ({ onLogout }) => {
     window.history.pushState({ view: 'categories' }, '');
     setView('categories');
   };
+  const handleNavigateBack = () => window.history.back();
 
-  const handleNavigateBack = () => {
-    window.history.back();
-  };
-
-
+  // Carica coda immagini all'avvio
   const loadQueuedImages = async () => {
     try {
       const images = await getQueuedImages();
       setQueuedImages(images);
     } catch (error) {
-      console.error("Failed to load queued images:", error);
+      console.error('Failed to load queued images:', error);
     }
   };
+  useEffect(() => {
+    loadQueuedImages();
+  }, []);
 
+  // Analizza immagine in coda
   const handleAnalyzeQueuedImage = async (image: OfflineImage) => {
     if (!isOnline || syncingImageId) return;
-
     setSyncingImageId(image.id);
     try {
-        const parsedDataArray = await parseExpensesFromImage(image.base64Image, image.mimeType);
-        
-        const validExpenses = parsedDataArray.filter(d => d.amount && d.amount > 0);
+      const parsedDataArray = await parseExpensesFromImage(image.base64Image, image.mimeType);
+      const validExpenses = parsedDataArray.filter(d => d.amount && d.amount > 0);
 
-        if (validExpenses.length > 0) {
-            const newExpenses: Expense[] = validExpenses.map(parsedData => ({
-                id: crypto.randomUUID(),
-                description: parsedData.description || `Spesa da immagine`,
-                amount: parsedData.amount!,
-                date: parsedData.date || new Date().toISOString().split('T')[0],
-                category: parsedData.category || 'Altro',
-                subcategory: parsedData.subcategory,
-            }));
-            setExpenses(prev => [...prev, ...newExpenses]);
-            setToast({ message: `${newExpenses.length} spes${newExpenses.length > 1 ? 'e' : 'a'} da immagine aggiunt${newExpenses.length > 1 ? 'e' : 'a'}!`, type: 'success' });
-        } else {
-            setToast({ message: "Importo non riconosciuto dall'immagine in coda.", type: 'info' });
-        }
-        await deleteImageFromQueue(image.id);
+      if (validExpenses.length > 0) {
+        const newExpenses: Expense[] = validExpenses.map(parsedData => ({
+          id: crypto.randomUUID(),
+          description: parsedData.description || `Spesa da immagine`,
+          amount: parsedData.amount!,
+          date: parsedData.date || new Date().toISOString().split('T')[0],
+          category: parsedData.category || 'Altro',
+          subcategory: parsedData.subcategory,
+        }));
+        setExpenses(prev => [...prev, ...newExpenses]);
+        setToast({
+          message: `${newExpenses.length} spes${newExpenses.length > 1 ? 'e' : 'a'} da immagine aggiunt${newExpenses.length > 1 ? 'e' : 'a'}.`,
+          type: 'success',
+        });
+      } else {
+        setToast({ message: "Importo non riconosciuto dall'immagine in coda.", type: 'info' });
+      }
+      await deleteImageFromQueue(image.id);
     } catch (error) {
-        console.error(`Failed to process image ${image.id}:`, error);
-        setToast({ message: 'Impossibile analizzare l\'immagine. Riprova.', type: 'info' });
+      console.error(`Failed to process image ${image.id}:`, error);
+      setToast({ message: "Impossibile analizzare l'immagine. Riprova.", type: 'info' });
     } finally {
-        setSyncingImageId(null);
-        await loadQueuedImages(); // Refresh the list
+      setSyncingImageId(null);
+      await loadQueuedImages();
     }
   };
 
   const handleDeleteQueuedImage = async (id: string) => {
     if (syncingImageId) return;
     try {
-        await deleteImageFromQueue(id);
-        await loadQueuedImages();
-        setToast({ message: 'Immagine rimossa dalla coda.', type: 'info' });
+      await deleteImageFromQueue(id);
+      await loadQueuedImages();
+      setToast({ message: 'Immagine rimossa dalla coda.', type: 'info' });
     } catch (error) {
-        console.error(`Failed to delete image ${id}:`, error);
-        setToast({ message: 'Impossibile rimuovere l\'immagine.', type: 'info' });
+      console.error(`Failed to delete image ${id}:`, error);
+      setToast({ message: "Impossibile rimuovere l'immagine.", type: 'info' });
     }
-  }
+  };
 
-  useEffect(() => {
-    loadQueuedImages();
-  }, []);
-
-
+  // CRUD spese
   const handleAddOrUpdateExpense = (expenseData: Omit<Expense, 'id'> | Expense) => {
     if ('id' in expenseData) {
       // Update
-      setExpenses(prev => prev.map(e => e.id === expenseData.id ? expenseData : e));
+      setExpenses(prev => prev.map(e => (e.id === expenseData.id ? expenseData : e)));
     } else {
       // Add
       const newExpense: Expense = {
@@ -140,9 +154,7 @@ const App: React.FC<AppProps> = ({ onLogout }) => {
 
   const handleDeleteExpense = (id: string) => {
     const expense = expenses.find(e => e.id === id);
-    if (expense) {
-      setExpenseToDelete(expense);
-    }
+    if (expense) setExpenseToDelete(expense);
   };
 
   const handleConfirmDelete = () => {
@@ -152,21 +164,19 @@ const App: React.FC<AppProps> = ({ onLogout }) => {
     }
   };
 
-  const handleCancelDelete = () => {
-    setExpenseToDelete(null);
-  };
+  const handleCancelDelete = () => setExpenseToDelete(null);
 
   const openFormToEdit = (expense: Expense) => {
     setEditingExpense(expense);
     setPrefilledData(undefined);
     setIsFormOpen(true);
   };
-  
+
   const openNewForm = () => {
     setEditingExpense(undefined);
     setPrefilledData(undefined);
     setIsFormOpen(true);
-  }
+  };
 
   const closeForm = () => {
     setIsFormOpen(false);
@@ -174,25 +184,27 @@ const App: React.FC<AppProps> = ({ onLogout }) => {
     setPrefilledData(undefined);
   };
 
+  // Risultati parser immagine / voce
   const handleImageParsed = (data: Partial<Omit<Expense, 'id'>>[]) => {
     setIsImageParserOpen(false);
-    
     const validExpenses = data.filter(d => d.amount && d.amount > 0);
-
     if (validExpenses.length === 0) {
-        setToast({ message: "Nessuna spesa valida trovata. Prova con un'altra immagine o aggiungi la spesa manualmente.", type: 'info' });
+      setToast({
+        message: "Nessuna spesa valida trovata. Prova con un'altra immagine o aggiungi la spesa manualmente.",
+        type: 'info',
+      });
     } else if (validExpenses.length === 1) {
-        setPrefilledData(validExpenses[0]);
-        setIsFormOpen(true);
+      setPrefilledData(validExpenses[0]);
+      setIsFormOpen(true);
     } else {
-        setParsedExpenses(validExpenses);
-        setIsMultiExpenseModalOpen(true);
+      setParsedExpenses(validExpenses);
+      setIsMultiExpenseModalOpen(true);
     }
   };
 
   const handleImageQueued = () => {
     loadQueuedImages();
-    setToast({ message: "Immagine salvata! Analizzala quando torni online.", type: 'info' });
+    setToast({ message: 'Immagine salvata! Analizzala quando torni online.', type: 'info' });
     setIsImageParserOpen(false);
   };
 
@@ -209,31 +221,28 @@ const App: React.FC<AppProps> = ({ onLogout }) => {
     }));
     setExpenses(prev => [...prev, ...newExpenses]);
     setIsMultiExpenseModalOpen(false);
-    setToast({ 
-        message: `${newExpenses.length} spes${newExpenses.length !== 1 ? 'e' : 'a'} aggiunt${newExpenses.length !== 1 ? 'e' : 'a'}!`, 
-        type: 'success' 
+    setToast({
+      message: `${newExpenses.length} spes${newExpenses.length !== 1 ? 'e' : 'a'} aggiunt${newExpenses.length !== 1 ? 'e' : 'a'}!`,
+      type: 'success',
     });
   };
 
-
+  // Apri parser immagine
   const openImageParser = (source: 'camera' | 'screenshot') => {
     setImageParserSource(source);
     setIsImageParserOpen(true);
   };
-  
+
+  // Filtri e ordinamenti
   const filteredExpenses = useMemo(() => {
-    if (selectedCategory === 'all') {
-      return expenses;
-    }
+    if (selectedCategory === 'all') return expenses;
     return expenses.filter(expense => expense.category === selectedCategory);
   }, [expenses, selectedCategory]);
 
-  // Sort expenses by date descending
   const sortedExpenses = useMemo(() => {
     return [...filteredExpenses].sort((a, b) => {
       const dateA = new Date(a.date).getTime();
       const dateB = new Date(b.date).getTime();
-      // Treat invalid dates as older than any valid date
       if (isNaN(dateA)) return 1;
       if (isNaN(dateB)) return -1;
       return dateB - dateA;
@@ -242,17 +251,26 @@ const App: React.FC<AppProps> = ({ onLogout }) => {
 
   return (
     <div className="min-h-screen bg-slate-100 font-sans text-slate-800">
-      <Header 
-        pendingSyncs={queuedImages.length}
-        isOnline={isOnline}
-        onLogout={onLogout}
-      />
+      <Header pendingSyncs={queuedImages.length} isOnline={isOnline} onLogout={onLogout} />
+
+      {/* Barra di test biometrico (solo per verifica) */}
+      <div className="container mx-auto px-4 md:px-8 my-4">
+        <div className="bg-white rounded-xl shadow p-4 flex items-center justify-between">
+          <div>
+            <div className="font-semibold">Test Autenticazione Biometrica</div>
+            <div className="text-sm text-slate-500">
+              {bioOK ? '✅ Autenticazione riuscita' : 'Premi il bottone per autenticarti'}
+            </div>
+          </div>
+          <BiometricButton onAuthenticated={() => setBioOK(true)} />
+        </div>
+      </div>
 
       <main className="container mx-auto p-4 md:p-8">
         {view === 'dashboard' ? (
           <div className="space-y-8">
             <Dashboard expenses={expenses} onNavigateToCategories={handleNavigateToCategories} />
-            
+
             <PendingImages
               images={queuedImages}
               onAnalyze={handleAnalyzeQueuedImage}
@@ -260,23 +278,25 @@ const App: React.FC<AppProps> = ({ onLogout }) => {
               isOnline={isOnline}
               syncingImageId={syncingImageId}
             />
-            
+
             <div className="bg-white p-6 rounded-2xl shadow-lg">
               <CategoryFilter selectedCategory={selectedCategory} onSelectCategory={setSelectedCategory} />
               {sortedExpenses.length > 0 ? (
                 <ExpenseList expenses={sortedExpenses} onEdit={openFormToEdit} onDelete={handleDeleteExpense} />
               ) : (
-                <p className="text-center text-slate-500 py-10">Nessuna spesa trovata. Prova a cambiare i filtri o ad aggiungerne una nuova.</p>
+                <p className="text-center text-slate-500 py-10">
+                  Nessuna spesa trovata. Prova a cambiare i filtri o ad aggiungerne una nuova.
+                </p>
               )}
             </div>
           </div>
         ) : (
-            <CategoryDetailScreen 
-                expenses={expenses} 
-                onNavigateBack={handleNavigateBack}
-                onEditExpense={openFormToEdit}
-                onDeleteExpense={handleDeleteExpense}
-            />
+          <CategoryDetailScreen
+            expenses={expenses}
+            onNavigateBack={handleNavigateBack}
+            onEditExpense={openFormToEdit}
+            onDeleteExpense={handleDeleteExpense}
+          />
         )}
       </main>
 
@@ -290,41 +310,37 @@ const App: React.FC<AppProps> = ({ onLogout }) => {
       )}
 
       {isFormOpen && (
-          <ExpenseForm 
-            isOpen={isFormOpen} 
-            onClose={closeForm} 
-            onSubmit={handleAddOrUpdateExpense}
-            initialData={editingExpense}
-            prefilledData={prefilledData}
-          />
+        <ExpenseForm
+          isOpen={isFormOpen}
+          onClose={closeForm}
+          onSubmit={handleAddOrUpdateExpense}
+          initialData={editingExpense}
+          prefilledData={prefilledData}
+        />
       )}
 
       {isImageParserOpen && (
         <ImageParserModal
-            isOpen={isImageParserOpen}
-            onClose={() => setIsImageParserOpen(false)}
-            onParsed={handleImageParsed}
-            onQueued={handleImageQueued}
-            source={imageParserSource}
+          isOpen={isImageParserOpen}
+          onClose={() => setIsImageParserOpen(false)}
+          onParsed={handleImageParsed}
+          onQueued={handleImageQueued}
+          source={imageParserSource}
         />
       )}
 
       {isVoiceInputOpen && (
-        <VoiceInputModal
-            isOpen={isVoiceInputOpen}
-            onClose={() => setIsVoiceInputOpen(false)}
-            onParsed={handleVoiceParsed}
-        />
+        <VoiceInputModal isOpen={isVoiceInputOpen} onClose={() => setIsVoiceInputOpen(false)} onParsed={handleVoiceParsed} />
       )}
 
-       {isMultiExpenseModalOpen && (
+      {isMultiExpenseModalOpen && (
         <MultipleExpensesModal
-            isOpen={isMultiExpenseModalOpen}
-            onClose={() => setIsMultiExpenseModalOpen(false)}
-            expenses={parsedExpenses}
-            onConfirm={handleConfirmMultipleExpenses}
+          isOpen={isMultiExpenseModalOpen}
+          onClose={() => setIsMultiExpenseModalOpen(false)}
+          expenses={parsedExpenses}
+          onConfirm={handleConfirmMultipleExpenses}
         />
-     )}
+      )}
 
       {expenseToDelete && (
         <ConfirmationModal
@@ -334,8 +350,8 @@ const App: React.FC<AppProps> = ({ onLogout }) => {
           title="Elimina Spesa"
           message={
             <>
-              Sei sicuro di voler eliminare la spesa "<strong>{expenseToDelete.description || 'Senza descrizione'}</strong>"? 
-              Questa azione non può essere annullata.
+              Sei sicuro di voler eliminare la spesa "
+              <strong>{expenseToDelete.description || 'Senza descrizione'}</strong>"? Questa azione non può essere annullata.
             </>
           }
         />
