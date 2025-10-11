@@ -124,12 +124,12 @@ export default function Diagnostics() {
         const c = await SpeechRecognition.checkPermissions?.();
         if (c && !getMicGranted(c)) return;
       }
-      await SpeechRecognition.start({ language: 'it-IT', partialResults: true, popup: false, maxResults: 1 });
+      await SpeechRecognition.start({ language: 'it-IT', partialResults: true, popup: true, maxResults: 1 });
       log('Speech.start OK');
       const onPartial = (r) => setSpeechLast(r?.matches?.[0] || '');
       const onResult  = (r) => setSpeechLast(r?.matches?.[0] || '');
-      SpeechRecognition.addListener('partialResults', onPartial);
-      SpeechRecognition.addListener('result', onResult);
+      SpeechRecognition.addListener('partialResults', (r)=>{ console.log('[speech] partial', r); onPartial(r); });
+      SpeechRecognition.addListener('result', (r)=>{ console.log('[speech] result', r); onResult(r); });
     } catch (e) {
       log('Speech.start ERR: ' + (e?.message || e));
       alert('Speech ERR: ' + (e?.message || e));
