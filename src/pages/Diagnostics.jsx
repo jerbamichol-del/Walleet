@@ -89,7 +89,7 @@ export default function Diagnostics() {
     for (const it of targets){
       if (!it.file) continue;
       try{
-        await loadScript(it.file); // es: plugins/cordova-plugin-speechrecognition/www/SpeechRecognition.js
+        await loadScript(it.file); // es: plugins/cordova-plugin-speechrecognition/www/speechRecognition.js
         loaded.push(it.file);
       }catch(e){
         return 'load-fail:'+it.file;
