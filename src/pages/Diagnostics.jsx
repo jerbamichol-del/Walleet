@@ -25,20 +25,72 @@ export default function Diagnostics() {
   const [bioType, setBioType] = useState('');
   const [langs, setLangs] = useState([]);
   const [status, setStatus] = useState([]);
+
+  // ✅ Stati che mancavano/talvolta non patchati
   const [cordovaReady, setCordovaReady] = useState(false);
+  const [cordovaLoaded, setCordovaLoaded] = useState(false);
 
   const listenerRefs = useRef({ partial: null, result: null, error: null });
   const startWatchdog = useRef(null);
 
-  const cordovaOK = !!(typeof window !== 'undefined' && window.cordova && window.cordova.plugins && window.cordova.plugins.speechRecognition);
-
   const log = (msg) => setStatus((s) => [String(msg), ...s].slice(0, 150));
 
-  function hasCordovaSpeech(){
+  function hasCordovaSpeech() {
     return typeof window !== 'undefined'
       && window.cordova
       && window.cordova.plugins
       && window.cordova.plugins.speechRecognition;
+  }
+  function cordovaState() {
+    return {
+      typeofCordova: typeof window !== 'undefined' ? typeof window.cordova : 'no-window',
+      hasPlugins: !!(typeof window !== 'undefined' && window.cordova && window.cordova.plugins),
+      hasSpeech: !!(typeof window !== 'undefined' && window.cordova && window.cordova.plugins && window.cordova.plugins.speechRecognition),
+    };
+  }
+
+  async function injectCordovaJs() {
+    try {
+      if (typeof window === 'undefined') return;
+      if (window.cordova) {
+        log('cordova.js già disponibile: ' + JSON.stringify(cordovaState()));
+        setCordovaLoaded(true);
+      } else {
+        // evita doppio inserimento
+        if (!document.querySelector('script[src="cordova.js"]')) {
+          const sc = document.createElement('script');
+          sc.src = 'cordova.js';
+          sc.onload = () => { log('cordova.js caricato'); setCordovaLoaded(true); };
+          sc.onerror = () => { log('cordova.js NON trovato (404)'); };
+          document.head.appendChild(sc);
+        }
+      }
+
+      // attendi deviceready
+      await new Promise((resolve) => {
+        const handler = () => {
+          log('deviceready fired');
+          setCordovaReady(true);
+          resolve();
+          document.removeEventListener('deviceready', handler, false);
+        };
+        document.addEventListener('deviceready', handler, false);
+        // fallback se deviceready è già avvenuto
+        setTimeout(() => {
+          if (typeof window !== 'undefined' && window.cordova) {
+            log('deviceready forse già passato: ' + JSON.stringify(cordovaState()));
+            resolve();
+          }
+        }, 1200);
+      });
+
+      // rileggi stato
+      log('Post-deviceready cordovaState: ' + JSON.stringify(cordovaState()));
+      if (hasCordovaSpeech()) log('Cordova driver: disponibile (post-inject)');
+      else log('Cordova driver: NON disponibile (post-inject)');
+    } catch (e) {
+      log('injectCordovaJs ERR: ' + (e?.message || e));
+    }
   }
 
   const getMicGranted = (obj) => {
@@ -72,16 +124,6 @@ export default function Diagnostics() {
   };
 
   useEffect(() => {
-    const onDeviceReady = () => {
-      setCordovaReady(true);
-      if (hasCordovaSpeech()) {
-        log('Cordova driver: disponibile (cordova-plugin-speechrecognition) [deviceready]');
-      } else {
-        log('Cordova driver: NON disponibile [deviceready]');
-      }
-    };
-    document.addEventListener('deviceready', onDeviceReady, false);
-
     const pf = Capacitor.getPlatform();
     setPlatform(pf);
 
@@ -98,7 +140,7 @@ export default function Diagnostics() {
         try { const a = await CapSpeech.available(); setSpeechAvail(a?.available ?? null); log('CapSpeech.available: ' + JSON.stringify(a)); }
         catch (e) { setSpeechAvail(false); log('CapSpeech.available ERR: ' + (e?.message || e)); }
         await refreshMicPerm();
-        try { const L = await CapSpeech.getSupportedLanguages?.(); if (L) { setLangs(L); log('CapSpeech.getSupportedLanguages: '+JSON.stringify(L).slice(0,200)+'...'); } }
+        try { const L = await CapSpeech.getSupportedLanguages?.(); if (L) { setLangs(L); log('CapSpeech.getSupportedLanguages: ' + JSON.stringify(L).slice(0,200) + '...'); } }
         catch (e) { log('getSupportedLanguages ERR: ' + (e?.message || e)); }
       } else {
         log('Plugin SpeechRecognition NON disponibile per Capacitor');
@@ -111,37 +153,22 @@ export default function Diagnostics() {
         log('Plugin NativeBiometric NON disponibile per Capacitor');
       }
 
-      if (hasCordovaSpeech()) { log('Cordova driver: disponibile (cordova-plugin-speechrecognition)'); } else { log('Cordova driver: NON disponibile (cordova-plugin-speechrecognition non caricato)'); }
+      // log stato cordova a mount
+      if (hasCordovaSpeech()) {
+        log('Cordova driver: disponibile (cordova-plugin-speechrecognition)');
+      } else {
+        log('Cordova driver: NON disponibile (cordova-plugin-speechrecognition non caricato)');
+      }
     })();
 
-      async function injectCordovaJs(){
-    try{
-      if (window.cordova) { log('cordova.js già disponibile: '+JSON.stringify(cordovaState())); setCordovaLoaded(true); return; }
-      // Evita doppio script
-      if (!document.querySelector('script[src="cordova.js"]')){
-        const sc = document.createElement('script');
-        sc.src = 'cordova.js';
-        sc.onload = () => { log('cordova.js caricato'); setCordovaLoaded(true); };
-        sc.onerror = () => { log('cordova.js NON trovato (404)'); };
-        document.head.appendChild(sc);
+    // auto-inject cordova.js su Android (comodo)
+    try {
+      if (typeof window !== 'undefined' && /android/i.test(navigator.userAgent)) {
+        setTimeout(() => injectCordovaJs(), 300);
       }
-      // Attendi deviceready
-      await new Promise((resolve)=>{
-        const handler = () => { log('deviceready fired'); setCordovaReady(true); resolve(); document.removeEventListener('deviceready', handler, false); };
-        document.addEventListener('deviceready', handler, false);
-        // Se era già arrivato
-          setTimeout(()=>{ if (typeof window !== 'undefined' && window.cordova) { log('deviceready forse già passato: '+JSON.stringify(cordovaState())); resolve(); } }, 1200);
-      });
-      // Rileggi stato
-      log('Post-deviceready cordovaState: '+JSON.stringify(cordovaState()));
-      if (hasCordovaSpeech()) log('Cordova driver: disponibile (post-inject)');
-      else log('Cordova driver: NON disponibile (post-inject)');
-    } catch(e){ log('injectCordovaJs ERR: '+(e?.message||e)); }
-  }
+    } catch (e) { log('auto-inject cordova.js ERR: ' + (e?.message || e)); }
 
-  return () => {
-      document.removeEventListener('deviceready', onDeviceReady, false);
-
+    return () => {
       try { CapSpeech.removeAllListeners?.(); } catch {}
       if (startWatchdog.current) { clearTimeout(startWatchdog.current); startWatchdog.current = null; }
     };
@@ -178,19 +205,16 @@ export default function Diagnostics() {
     try {
       if (!listenerRefs.current.partial) {
         listenerRefs.current.partial = CapSpeech.addListener('partialResults', (r) => {
-          console.log('[capspeech] partial', r);
           setSpeechLast(r?.matches?.[0] || '');
         });
       }
       if (!listenerRefs.current.result) {
         listenerRefs.current.result = CapSpeech.addListener('result', (r) => {
-          console.log('[capspeech] result', r);
           setSpeechLast(r?.matches?.[0] || '');
         });
       }
       if (!listenerRefs.current.error) {
         listenerRefs.current.error = CapSpeech.addListener('error', (e) => {
-          console.error('[capspeech] error', e);
           log('CapSpeech error: ' + JSON.stringify(e));
         });
       }
@@ -223,8 +247,8 @@ export default function Diagnostics() {
   };
 
   // ===== DRIVER CORDOVA =====
-  const reqCordovaPerm = async () => { if (!hasCordovaSpeech()) return log('Cordova driver non disponibile');
-    if (!cordovaOK) return log('Cordova driver non disponibile');
+  const reqCordovaPerm = async () => {
+    if (!hasCordovaSpeech()) return log('Cordova driver non disponibile');
     try {
       const has = await window.cordova.plugins.speechRecognition.hasPermission();
       log('Cordova.hasPermission: ' + JSON.stringify(has));
@@ -237,20 +261,18 @@ export default function Diagnostics() {
     }
   };
 
-  const startSpeechCordova = async () => { if (!hasCordovaSpeech()) return log('Cordova driver non disponibile');
-    if (!cordovaOK) return log('Cordova driver non disponibile');
+  const startSpeechCordova = async () => {
+    if (!hasCordovaSpeech()) return log('Cordova driver non disponibile');
     try {
       const has = await window.cordova.plugins.speechRecognition.hasPermission();
       if (!has) await window.cordova.plugins.speechRecognition.requestPermission();
 
       await window.cordova.plugins.speechRecognition.startListening(
         (matches) => {
-          console.log('[cordova speech] result', matches);
           setSpeechLast(matches?.[0] || '');
           log('Cordova result: ' + JSON.stringify(matches));
         },
         (err) => {
-          console.error('[cordova speech] error', err);
           log('Cordova error: ' + JSON.stringify(err));
         },
         {
@@ -266,8 +288,8 @@ export default function Diagnostics() {
     }
   };
 
-  const stopSpeechCordova = async () => { if (!hasCordovaSpeech()) return;
-    if (!cordovaOK) return;
+  const stopSpeechCordova = async () => {
+    if (!hasCordovaSpeech()) return;
     try { await window.cordova.plugins.speechRecognition.stopListening(); log('Cordova.stopListening OK'); }
     catch (e) { log('Cordova.stopListening ERR: ' + (e?.message || e)); }
   };
@@ -309,10 +331,13 @@ export default function Diagnostics() {
 
       <div>available(): <Tag ok={speechAvail} label={String(speechAvail)} /></div>
       <div>hasPermission(): <Tag ok={speechPerm} label={String(speechPerm)} /></div>
-<div style={{fontSize:12,opacity:0.8}}>cordovaReady: <code>{String(cordovaReady)}</code>, cordovaLoaded: <code>{String(cordovaLoaded)}</code></div>
+      <div style={{fontSize:12,opacity:0.8}}>
+        cordovaReady: <code>{String(cordovaReady)}</code>, cordovaLoaded: <code>{String(cordovaLoaded)}</code>
+      </div>
 
       <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button onClick={injectCordovaJs}>Carica cordova.js e attendi deviceready</button>
+
         {/* Capacitor driver */}
         <button onClick={reqSpeechPerm}>Permesso (Capacitor)</button>
         <button onPointerDown={startSpeechCap} onPointerUp={stopSpeechCap}>🎙️ (Capacitor) Premi e parla</button>
