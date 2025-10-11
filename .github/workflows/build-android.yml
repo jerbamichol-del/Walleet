@@ -26,7 +26,7 @@ jobs:
       - name: Install deps (npm ci)
         run: npm ci
 
-      # ✅ Usa gli asset legacy e inietta gli shim dal repo (niente heredoc)
+      # ✅ Usa gli asset legacy e inietta gli shim dal repo
       - name: Prepare web assets (LEGACY + inject shims)
         shell: bash
         run: |
@@ -37,26 +37,28 @@ jobs:
             mkdir -p www
             cp -a legacy_www_final/* www/
 
-            # copia shim biometrico (obbligatorio per questa pipeline)
+            # biometrico OBBLIGATORIO
             if [[ -f tools/shim-biometric.js ]]; then
               cp tools/shim-biometric.js www/shim-biometric.js
+              perl -0777 -pe 's#</body>#  <script type="module" src="./shim-biometric.js"></script>\n</body>#igs' -i www/index.html || true
             else
-              echo "ERROR: tools/shim-biometric.js non trovato."
-              exit 1
+              echo "ERROR: tools/shim-biometric.js non trovato."; exit 1
             fi
 
-            # copia settings shim SE presente (toggle + gear)
-            HAS_SETTINGS=0
+            # speech-permission (OPZIONALE)
+            if [[ -f tools/speech-permission-shim.js ]]; then
+              cp tools/speech-permission-shim.js www/speech-permission-shim.js
+              perl -0777 -pe 's#</body>#  <script type="module" src="./speech-permission-shim.js"></script>\n</body>#igs' -i www/index.html || true
+            else
+              echo "INFO: tools/speech-permission-shim.js non presente (ok)."
+            fi
+
+            # settings (OPZIONALE)
             if [[ -f tools/settings-shim.js ]]; then
               cp tools/settings-shim.js www/settings-shim.js
-              HAS_SETTINGS=1
-            fi
-
-            # inietta gli script prima di </body>
-            if [[ "$HAS_SETTINGS" -eq 1 ]]; then
-              perl -0777 -pe 's#</body>#  <script type="module" src="./shim-biometric.js"></script>\n  <script type="module" src="./settings-shim.js"></script>\n</body>#igs' -i www/index.html || true
+              perl -0777 -pe 's#</body>#  <script type="module" src="./settings-shim.js"></script>\n</body>#igs' -i www/index.html || true
             else
-              perl -0777 -pe 's#</body>#  <script type="module" src="./shim-biometric.js"></script>\n</body>#igs' -i www/index.html || true
+              echo "INFO: tools/settings-shim.js non presente (ok)."
             fi
           else
             echo "legacy_www_final non trovato: build con Vite"
