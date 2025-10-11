@@ -1,36 +1,42 @@
 name: Android Debug APK
+
 on:
   push:
-    branches: [ feat/biometrics ]
-  workflow_dispatch: {}
+    branches: [ "feat/biometrics" ]
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install deps & build web
-        run: |
-          npm ci
-          npm run build
-      - name: Capacitor sync (android)
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build web (Vite -> www)
+        run: npm run build
+
+      - name: Capacitor sync android (include Cordova plugins)
         run: npx cap sync android
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '21'
-      - name: Build APK (debug) with bumped version
-        run: |
-          cd android
-          VERSION_CODE=${{ github.run_number }}
-          VERSION_NAME="test-${{ github.run_number }}"
-          ./gradlew assembleDebug -PVERSION_CODE=$VERSION_CODE -PVERSION_NAME=$VERSION_NAME
-      - name: Upload APK artifact
+
+      - name: Build Android debug APK
+        working-directory: android
+        run: ./gradlew --no-daemon clean assembleDebug
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Walleet-debug-apk
+          name: walleet-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
