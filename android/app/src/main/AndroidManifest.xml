@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- ✅ Permessi (solo a livello <manifest>, non dentro <application>) -->
+    <!-- Permessi (solo a livello <manifest>) -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.USE_FINGERPRINT" />
 
-    <!-- ✅ Feature opzionali (non bloccano l’installazione su device senza HW) -->
+    <!-- Feature opzionali (non bloccano l’installazione su device senza HW) -->
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
     <uses-feature android:name="android.hardware.fingerprint" android:required="false" />
     <uses-feature android:name="android.hardware.biometrics" android:required="false" />
@@ -15,15 +15,15 @@
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
-        android:label="@string/app_name"
+        android:label="Walleet (DIAG)"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
-        <!-- ✅ MainActivity con configChanges completo per Capacitor -->
+        <!-- MainActivity con configChanges completo per Capacitor -->
         <activity
             android:name=".MainActivity"
-            android:label="@string/title_activity_main"
+            android:label="Walleet (DIAG)"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
             android:exported="true"
@@ -36,7 +36,7 @@
 
         </activity>
 
-        <!-- ✅ FileProvider (necessario per share/files) -->
+        <!-- FileProvider (necessario per share/files) -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
