@@ -49,7 +49,17 @@ export default function Diagnostics() {
     };
   }
 
-  async function injectCordovaJs() {
+  function loadScript(src){
+  return new Promise((resolve,reject)=>{
+    const el = document.createElement('script');
+    el.src = src;
+    el.onload = ()=>resolve(src);
+    el.onerror = ()=>reject(new Error('script load fail: '+src));
+    document.head.appendChild(el);
+  });
+}
+
+async function injectCordovaJs() {
     try {
       if (typeof window === 'undefined') return;
       if (window.cordova) {
@@ -84,8 +94,15 @@ export default function Diagnostics() {
         }, 1200);
       });
 
+      // prova a caricare i plugin se non risultano ancora presenti
+      await ensureCordovaPluginSpeech();
       // rileggi stato
       log('Post-deviceready cordovaState: ' + JSON.stringify(cordovaState()));
+      if (window.plugins && window.plugins.speechRecognition){
+        log('Cordova plugin speech: OGGETTO presente su window.plugins');
+      } else {
+        log('Cordova plugin speech: OGGETTO NON presente (fallback non ha montato)');
+      }
       if (hasCordovaSpeech()) log('Cordova driver: disponibile (post-inject)');
       else log('Cordova driver: NON disponibile (post-inject)');
     } catch (e) {
