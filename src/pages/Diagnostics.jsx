@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { SpeechRecognition } from '@capacitor-community/speech-recognition';
+import { SpeechRecognition as CapSpeech } from '@capacitor-community/speech-recognition';
 import { NativeBiometric } from '@capgo/capacitor-native-biometric';
 
 function Tag({ ok, label }) {
@@ -29,10 +29,11 @@ export default function Diagnostics() {
   const listenerRefs = useRef({ partial: null, result: null, error: null });
   const startWatchdog = useRef(null);
 
-  const log = (msg) => setStatus((s) => [String(msg), ...s].slice(0, 120));
+  const cordovaOK = !!(typeof window !== 'undefined' && window.cordova && window.cordova.plugins && window.cordova.plugins.speechRecognition);
+
+  const log = (msg) => setStatus((s) => [String(msg), ...s].slice(0, 150));
 
   const getMicGranted = (obj) => {
-    // Il plugin può restituire: { speechRecognition:"granted" } oppure { status/microphone/state:"granted" }
     const v = obj || {};
     const st = v.speechRecognition || v.microphone || v.status || v.state;
     return st === 'granted';
@@ -44,17 +45,17 @@ export default function Diagnostics() {
         setSpeechPerm(false);
         return;
       }
-      if (typeof SpeechRecognition.checkPermissions === 'function') {
-        const res = await SpeechRecognition.checkPermissions();
+      if (typeof CapSpeech.checkPermissions === 'function') {
+        const res = await CapSpeech.checkPermissions();
         setSpeechPerm(getMicGranted(res));
-        log('Speech.checkPermissions: ' + JSON.stringify(res));
-      } else if (typeof SpeechRecognition.hasPermission === 'function') {
-        const res = await SpeechRecognition.hasPermission();
+        log('CapSpeech.checkPermissions: ' + JSON.stringify(res));
+      } else if (typeof CapSpeech.hasPermission === 'function') {
+        const res = await CapSpeech.hasPermission();
         setSpeechPerm(!!res?.permission);
-        log('Speech.hasPermission(legacy): ' + JSON.stringify(res));
+        log('CapSpeech.hasPermission(legacy): ' + JSON.stringify(res));
       } else {
         setSpeechPerm(null);
-        log('Nessuna API permessi disponibile su SpeechRecognition');
+        log('Nessuna API permessi disponibile su CapSpeech');
       }
     } catch (e) {
       setSpeechPerm(false);
@@ -76,10 +77,11 @@ export default function Diagnostics() {
 
     (async () => {
       if (speechOK) {
-        try { const a = await SpeechRecognition.available(); setSpeechAvail(a?.available ?? null); log('Speech.available: ' + JSON.stringify(a)); }
-        catch (e) { setSpeechAvail(false); log('Speech.available ERR: ' + (e?.message || e)); }
+        try { const a = await CapSpeech.available(); setSpeechAvail(a?.available ?? null); log('CapSpeech.available: ' + JSON.stringify(a)); }
+        catch (e) { setSpeechAvail(false); log('CapSpeech.available ERR: ' + (e?.message || e)); }
         await refreshMicPerm();
-        try { const L = await SpeechRecognition.getSupportedLanguages?.(); if (L) { setLangs(L); log('Speech.getSupportedLanguages: '+JSON.stringify(L).slice(0,200)+'...'); } } catch(e) { log('getSupportedLanguages ERR: '+(e?.message||e)); }
+        try { const L = await CapSpeech.getSupportedLanguages?.(); if (L) { setLangs(L); log('CapSpeech.getSupportedLanguages: '+JSON.stringify(L).slice(0,200)+'...'); } }
+        catch (e) { log('getSupportedLanguages ERR: ' + (e?.message || e)); }
       } else {
         log('Plugin SpeechRecognition NON disponibile per Capacitor');
       }
@@ -90,33 +92,38 @@ export default function Diagnostics() {
       } else {
         log('Plugin NativeBiometric NON disponibile per Capacitor');
       }
+
+      if (cordovaOK) {
+        log('Cordova driver: disponibile (cordova-plugin-speechrecognition)');
+      } else {
+        log('Cordova driver: NON disponibile (cordova-plugin-speechrecognition non caricato)');
+      }
     })();
 
-    // pulizia listeners on unmount
     return () => {
-      try { SpeechRecognition.removeAllListeners(); } catch {}
+      try { CapSpeech.removeAllListeners?.(); } catch {}
       if (startWatchdog.current) { clearTimeout(startWatchdog.current); startWatchdog.current = null; }
     };
   }, []);
 
   const reqSpeechPerm = async () => {
     try {
-      if (typeof SpeechRecognition.requestPermissions === 'function') {
-        const r = await SpeechRecognition.requestPermissions();
-        log('Speech.requestPermissions: ' + JSON.stringify(r));
-        const c = await SpeechRecognition.checkPermissions?.();
+      if (typeof CapSpeech.requestPermissions === 'function') {
+        const r = await CapSpeech.requestPermissions();
+        log('CapSpeech.requestPermissions: ' + JSON.stringify(r));
+        const c = await CapSpeech.checkPermissions?.();
         if (c) {
           setSpeechPerm(getMicGranted(c));
-          log('Speech.checkPermissions (post-request): ' + JSON.stringify(c));
+          log('CapSpeech.checkPermissions (post-request): ' + JSON.stringify(c));
         } else {
           setSpeechPerm(getMicGranted(r));
         }
-      } else if (typeof SpeechRecognition.requestPermission === 'function') {
-        const r = await SpeechRecognition.requestPermission();
+      } else if (typeof CapSpeech.requestPermission === 'function') {
+        const r = await CapSpeech.requestPermission();
         setSpeechPerm(!!r?.permission);
-        log('Speech.requestPermission(legacy): ' + JSON.stringify(r));
+        log('CapSpeech.requestPermission(legacy): ' + JSON.stringify(r));
       } else {
-        log('API richiesta permessi non disponibile su SpeechRecognition');
+        log('API richiesta permessi non disponibile su CapSpeech');
         alert('Richiesta permessi non disponibile su questo plugin/build.');
       }
     } catch (e) {
@@ -125,24 +132,25 @@ export default function Diagnostics() {
     }
   };
 
+  // ===== DRIVER CAPACITOR =====
   const attachListenersIfNeeded = () => {
     try {
       if (!listenerRefs.current.partial) {
-        listenerRefs.current.partial = SpeechRecognition.addListener('partialResults', (r) => {
-          console.log('[speech] partial', r);
+        listenerRefs.current.partial = CapSpeech.addListener('partialResults', (r) => {
+          console.log('[capspeech] partial', r);
           setSpeechLast(r?.matches?.[0] || '');
         });
       }
       if (!listenerRefs.current.result) {
-        listenerRefs.current.result = SpeechRecognition.addListener('result', (r) => {
-          console.log('[speech] result', r);
+        listenerRefs.current.result = CapSpeech.addListener('result', (r) => {
+          console.log('[capspeech] result', r);
           setSpeechLast(r?.matches?.[0] || '');
         });
       }
       if (!listenerRefs.current.error) {
-        listenerRefs.current.error = SpeechRecognition.addListener('error', (e) => {
-          console.error('[speech] error', e);
-          log('Speech error: ' + JSON.stringify(e));
+        listenerRefs.current.error = CapSpeech.addListener('error', (e) => {
+          console.error('[capspeech] error', e);
+          log('CapSpeech error: ' + JSON.stringify(e));
         });
       }
     } catch (e) {
@@ -150,54 +158,81 @@ export default function Diagnostics() {
     }
   };
 
-  const startSpeech = async () => {
+  const startSpeechCap = async () => {
     try {
-      // Permessi
       if (speechPerm !== true) {
         await reqSpeechPerm();
-        const c = await SpeechRecognition.checkPermissions?.();
+        const c = await CapSpeech.checkPermissions?.();
         if (c && !getMicGranted(c)) return;
       }
-
-      // Listener PRIMA dello start
       attachListenersIfNeeded();
-
-      // Watchdog: se non arrivano eventi entro 6s, avvisa
       if (startWatchdog.current) clearTimeout(startWatchdog.current);
-      startWatchdog.current = setTimeout(() => {
-        log('⚠️ Nessun evento dal riconoscimento entro 6s (prova popup:true, lingua, servizi Google).');
-      }, 6000);
+      startWatchdog.current = setTimeout(() => log('⚠️ Nessun evento (Capacitor) entro 6s.'), 6000);
 
-      await SpeechRecognition.start({
-        language: 'it-IT',
-        partialResults: false,
-        popup: true,       // forziamo il popup nativo
-        maxResults: 5,
-        continuous: false,
-      });
-      log('Speech.start OK');
-      console.log('[speech] start called');
+      await CapSpeech.start({ language: 'it-IT', partialResults: false, popup: true, maxResults: 5, continuous: false });
+      log('CapSpeech.start OK');
     } catch (e) {
-      log('Speech.start ERR: ' + (e?.message || e));
-      alert('Speech ERR: ' + (e?.message || e));
+      log('CapSpeech.start ERR: ' + (e?.message || e));
     }
   };
 
-  const stopSpeech = async () => {
+  const stopSpeechCap = async () => {
+    try { await CapSpeech.stop(); log('CapSpeech.stop OK'); if (startWatchdog.current) { clearTimeout(startWatchdog.current); startWatchdog.current = null; } }
+    catch (e) { log('CapSpeech.stop ERR: ' + (e?.message || e)); }
+  };
+
+  // ===== DRIVER CORDOVA =====
+  const reqCordovaPerm = async () => {
+    if (!cordovaOK) return log('Cordova driver non disponibile');
     try {
-      await SpeechRecognition.stop();
-      console.log('[speech] stop called');
-      log('Speech.stop OK');
-      if (startWatchdog.current) { clearTimeout(startWatchdog.current); startWatchdog.current = null; }
-      // NON rimuovo i listener subito: servono per ricevere l'ultimo "result"
+      const has = await window.cordova.plugins.speechRecognition.hasPermission();
+      log('Cordova.hasPermission: ' + JSON.stringify(has));
+      if (!has) {
+        const r = await window.cordova.plugins.speechRecognition.requestPermission();
+        log('Cordova.requestPermission: ' + JSON.stringify(r));
+      }
     } catch (e) {
-      log('Speech.stop ERR: ' + (e?.message || e));
+      log('Cordova perm ERR: ' + (e?.message || e));
     }
+  };
+
+  const startSpeechCordova = async () => {
+    if (!cordovaOK) return log('Cordova driver non disponibile');
+    try {
+      const has = await window.cordova.plugins.speechRecognition.hasPermission();
+      if (!has) await window.cordova.plugins.speechRecognition.requestPermission();
+
+      await window.cordova.plugins.speechRecognition.startListening(
+        (matches) => {
+          console.log('[cordova speech] result', matches);
+          setSpeechLast(matches?.[0] || '');
+          log('Cordova result: ' + JSON.stringify(matches));
+        },
+        (err) => {
+          console.error('[cordova speech] error', err);
+          log('Cordova error: ' + JSON.stringify(err));
+        },
+        {
+          language: 'it-IT',
+          matches: 5,
+          showPartial: false,
+          showPopup: true,
+        }
+      );
+      log('Cordova.startListening OK');
+    } catch (e) {
+      log('Cordova.startListening ERR: ' + (e?.message || e));
+    }
+  };
+
+  const stopSpeechCordova = async () => {
+    if (!cordovaOK) return;
+    try { await window.cordova.plugins.speechRecognition.stopListening(); log('Cordova.stopListening OK'); }
+    catch (e) { log('Cordova.stopListening ERR: ' + (e?.message || e)); }
   };
 
   const testBiometric = async () => {
     try {
-      // Considera successo se NON lancia eccezioni
       await NativeBiometric.verifyIdentity({
         reason: 'Sblocca Walleet',
         title: 'Sblocca Walleet',
@@ -223,24 +258,32 @@ export default function Diagnostics() {
       <div>Capacitor.isPluginAvailable('NativeBiometric'): <Tag ok={availBioPlugin} label={String(availBioPlugin)} /></div>
 
       <h3 style={{ marginTop: 12 }}>Microfono / Speech</h3>
-<div style={{fontSize:12,opacity:0.85,background:'#11182711',padding:8,borderRadius:8}}>
-<b>Guida debug voce</b><br/>
-1) Aggiorna <b>Google</b> e <b>Speech Services by Google</b> dal Play Store.<br/>
-2) Imposta <b>Impostazioni → App → App predefinite → Inserimento vocale</b> su <b>Google</b> (non quello del produttore).<br/>
-3) In <b>Impostazioni → App → Google → Permessi</b> consenti <b>Microfono</b>.<br/>
-4) Riavvia l'app e riprova.
-</div>
+      <div style={{fontSize:12,opacity:0.85,background:'#11182711',padding:8,borderRadius:8}}>
+        <b>Guida debug voce</b><br/>
+        1) Aggiorna <b>Google</b> e <b>Speech Services by Google</b> dal Play Store.<br/>
+        2) Imposta <b>Impostazioni → App → App predefinite → Inserimento vocale</b> su <b>Google</b> (non quello del produttore).<br/>
+        3) In <b>Impostazioni → App → Google → Permessi</b> consenti <b>Microfono</b>.<br/>
+        4) Riavvia l’app e riprova.
+      </div>
+
       <div>available(): <Tag ok={speechAvail} label={String(speechAvail)} /></div>
       <div>hasPermission(): <Tag ok={speechPerm} label={String(speechPerm)} /></div>
+
       <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button onClick={async()=>{ try{ const L=await SpeechRecognition.getSupportedLanguages?.(); if(L){ setLangs(L); log('Self-test: languages '+L.length); } }catch(e){ log('Self-test ERR: '+(e?.message||e)); } }}>Self-test lingue</button>
-        <button onClick={reqSpeechPerm}>Concedi permesso microfono</button>
-        <button onPointerDown={startSpeech} onPointerUp={stopSpeech}>🎙️ Premi e parla</button>
-        <button onClick={startSpeech}>Avvia (tap)</button>
-        <button onClick={stopSpeech}>Stop</button>
+        {/* Capacitor driver */}
+        <button onClick={reqSpeechPerm}>Permesso (Capacitor)</button>
+        <button onPointerDown={startSpeechCap} onPointerUp={stopSpeechCap}>🎙️ (Capacitor) Premi e parla</button>
+        <button onClick={startSpeechCap}>Avvia (Capacitor)</button>
+        <button onClick={stopSpeechCap}>Stop (Capacitor)</button>
+
+        {/* Cordova driver */}
+        <button onClick={reqCordovaPerm}>Permesso (Cordova)</button>
+        <button onClick={startSpeechCordova}>🎙️ Prova driver Cordova</button>
+        <button onClick={stopSpeechCordova}>Stop (Cordova)</button>
       </div>
+
       <div style={{ marginTop: 6 }}>Ultimo riconosciuto: <code>{speechLast}</code></div>
-<div style={{ marginTop: 6, fontSize:12, opacity:0.85 }}>Lingue supportate (sample): <code>{(langs||[]).slice(0,6).join(', ')||'-'}</code></div>
+      <div style={{ marginTop: 6, fontSize:12, opacity:0.85 }}>Lingue supportate (Capacitor sample): <code>{(langs||[]).slice(0,6).join(', ')||'-'}</code></div>
 
       <h3 style={{ marginTop: 12 }}>Biometria</h3>
       <div>isAvailable(): <Tag ok={bioAvail} label={String(bioAvail)} /></div>
@@ -250,7 +293,7 @@ export default function Diagnostics() {
       </div>
 
       <h3 style={{ marginTop: 12 }}>Log</h3>
-      <pre style={{ background: '#0b1020', color: '#cbd5e1', padding: 12, borderRadius: 8, maxHeight: 280, overflow: 'auto' }}>
+      <pre style={{ background: '#0b1020', color: '#cbd5e1', padding: 12, borderRadius: 8, maxHeight: 340, overflow: 'auto' }}>
 {status.map((l) => `• ${l}\n`)}
       </pre>
     </div>
