@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
+import { App } from '@capacitor/app';
 import { SpeechRecognition as CapSpeech } from '@capacitor-community/speech-recognition';
 import { NativeBiometric } from '@capgo/capacitor-native-biometric';
 
@@ -178,6 +179,22 @@ const startSpeechCap = async () => {
   };
 
   useEffect(() => {
+  // Quando si chiude il popup di Google, l'app torna attiva: forza stop() per flush risultati
+  const appSub = App.addListener('appStateChange', async (state) => {
+    try {
+      if (state && state.isActive) {
+        setTimeout(async ()=>{
+          try { await CapSpeech.stop(); log('auto-stop dopo resume (flush risultati)'); } catch(e){ log('auto-stop ERR: '+(e?.message||e)); }
+        }, 250);
+      }
+    } catch(e){ log('appStateChange ERR: '+(e?.message||e)); }
+  });
+  
+  // cleanup
+  const _cleanupApp = () => { try { appSub && appSub.remove && appSub.remove(); } catch(_){} };
+  
+  // (il resto del tuo useEffect prosegue sotto)
+
     setPlatform(Capacitor.getPlatform());
     let speechOK=false, bioOK=false;
     try { speechOK = Capacitor.isPluginAvailable('SpeechRecognition'); } catch {}
@@ -200,6 +217,9 @@ const startSpeechCap = async () => {
     })();
 
     return () => {
+  try { /* rimuovi listener App */ App.removeAllListeners && App.removeAllListeners(); } catch(_){ }
+  _cleanupApp && _cleanupApp();
+
       try { CapSpeech.removeAllListeners?.(); } catch {}
       if (startWatchdog.current) { clearTimeout(startWatchdog.current); startWatchdog.current = null; }
     };
@@ -226,6 +246,7 @@ const startSpeechCap = async () => {
 <button onClick={startSpeechCap_en_popup}>Avvia en-US (popup)</button>
 <button onClick={startSpeechCap_default_nopopup}>Avvia default (no popup, continuous)</button>
         <button onClick={stopSpeechCap}>Stop (Capacitor)</button>
+<button onClick={async()=>{ try{ await CapSpeech.stop(); log('Forza stop post-popup'); }catch(e){ log('Forza stop ERR: '+(e?.message||e)); } }}>Forza stop post-popup</button>
 
         {/* Web Speech (shim opzionale) */}
         <button onClick={startWebSpeech}>🎤 Web Speech (shim) Avvia</button>
