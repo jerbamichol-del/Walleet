@@ -1,36 +1,41 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# =============================================
-# WALLEET — SAVE SNAPSHOT
-# =============================================
+set -Eeuo pipefail
+ROOT="$HOME/Walleet"
+SNAP="$ROOT/_snapshots"; mkdir -p "$SNAP"
+cd "$ROOT"
 
-PROJECT_DIR="/data/data/com.termux/files/home/Walleet"
-SNAPSHOT_DIR="$PROJECT_DIR/_snapshots"
+LABEL="${*:-snapshot}"
+LABEL_SAFE="$(echo "$LABEL" | tr ' ' '_' | tr -cd '[:alnum:]_.-')"
+TS="$(date +%Y-%m-%d_%H-%M-%S)"
 
-mkdir -p "$SNAPSHOT_DIR"
+ARCH="$SNAP/snapshot_${TS}_${LABEL_SAFE}.tar.gz"
+LOG="$SNAP/status_${TS}_${LABEL_SAFE}.log"
 
-echo "🧠 Inserisci una breve descrizione dello stato stabile (es: fix-audio, post-build OK):"
-read DESC
-
-# Genera timestamp completo: giorno-mese-anno_ora-minuti-secondi
-TIMESTAMP=$(date +"%d-%m-%Y_%H-%M-%S")
-
-# Nome log e tag Git
-LOG_FILE="$SNAPSHOT_DIR/status_${TIMESTAMP}-${DESC}.log"
-TAG_NAME="stable-${TIMESTAMP}-${DESC}"
-
-# Salva lo stato git e l'elenco dei file principali
-echo "📦 Creazione snapshot Walleet ($TAG_NAME)..."
 {
-  echo "Tag Git: $TAG_NAME"
-  echo "Data: $TIMESTAMP"
-  echo "Descrizione: $DESC"
-  echo ""
-  git -C "$PROJECT_DIR" status
-} > "$LOG_FILE"
+  echo "Snapshot: $(basename "$ARCH")"
+  echo "Date: $TS"
+  echo "Label: $LABEL"
+  echo
+  echo "## Toolchain"
+  echo -n "node: "; node -v 2>/dev/null || echo "n/a"
+  echo -n "npm:  "; npm -v 2>/dev/null || echo "n/a"
+  java -version 2>&1 | head -n 1 || true
+  echo
+  echo "## Git (opzionale)"
+  git -C "$ROOT" status 2>/dev/null || echo "no git"
+} | tee "$LOG"
 
-# Crea tag Git
-git -C "$PROJECT_DIR" add .
-git -C "$PROJECT_DIR" commit -m "Snapshot $TAG_NAME" >/dev/null 2>&1
-git -C "$PROJECT_DIR" tag "$TAG_NAME"
+tar --exclude="./_snapshots" --exclude="./.git" --exclude="./node_modules" \
+    --exclude="./android/.gradle" --exclude="./android/app/build" \
+    --exclude="./.gradle" --exclude="./.npm" --exclude="./_apk" \
+    -czf "$ARCH" .
 
-echo "✅ Snapshot creato: $LOG_FILE"
+echo -e "$TS\t$(basename "$ARCH")\t$LABEL" >> "$SNAP/index.tsv"
+
+if [ -d /sdcard/Download ]; then
+  OUT="/sdcard/Download/Walleet-logs"; mkdir -p "$OUT"
+  cp -f "$LOG" "$OUT/"
+  echo "📄 Copiato: $OUT/$(basename "$LOG")"
+fi
+
+echo "✅ Salvato: $ARCH"

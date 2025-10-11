@@ -1,37 +1,15 @@
 #!/data/data/com.termux/files/usr/bin/bash
-# =============================================
-# WALLEET — LIST SNAPSHOTS
-# =============================================
-
-SNAPDIR="/data/data/com.termux/files/home/Walleet/_snapshots"
-GITDIR="/data/data/com.termux/files/home/Walleet"
-
-echo ""
-echo "📜 LISTA SNAPSHOT DISPONIBILI:"
-echo "=============================="
-
-# --- Lista tag Git
-i=1
-echo "🗃️  SNAPSHOT GIT:"
-for tag in $(git -C "$GITDIR" tag | grep '^stable-' | sort -r); do
-  TAG_DATE=$(echo "$tag" | cut -d'-' -f2-4 | tr '_' ' ')
-  TAG_DESC=$(echo "$tag" | cut -d'-' -f5- | tr '-' ' ')
-  printf "[%d] %s\n     📅 Data/Ora: %s\n     📝 Descrizione: %s\n\n" "$i" "$tag" "$TAG_DATE" "$TAG_DESC"
-  ((i++))
-done
-
-# --- Lista log locali
-if [ -d "$SNAPDIR" ]; then
-  LOGS=$(ls -1t "$SNAPDIR" | grep '^status_')
-  if [ ! -z "$LOGS" ]; then
-    echo "🗂️  LOG LOCALI (più recenti in alto):"
-    echo ""
-    i=1
-    for log in $LOGS; do
-      FILE_DATE=$(echo "$log" | sed 's/status_//' | sed 's/\.log//' | awk -F'-' '{printf "%s-%s-%s %s:%s:%s", $1,$2,$3,$4,$5,$6}')
-      FILE_DESC=$(echo "$log" | sed 's/status_.*-//' | sed 's/\.log//')
-      printf "[%d] %s\n     📅 Data/Ora: %s\n     📝 Descrizione: %s\n\n" "$i" "$log" "$FILE_DATE" "$FILE_DESC"
-      ((i++))
-    done
-  fi
+set -Eeuo pipefail
+ROOT="$HOME/Walleet"; SNAP="$ROOT/_snapshots"
+[ -d "$SNAP" ] || { echo "Nessun _snapshots/"; exit 0; }
+echo "ID | Data               | Etichetta                      | File"
+if [ -f "$SNAP/index.tsv" ]; then
+  nl -w2 -s"  " "$SNAP/index.tsv" | awk -F'\t' '{printf "%2s | %-19s | %-28s | %s\n",$1,$2,$4,$3}'
+else
+  ls -1t "$SNAP"/snapshot_*.tar.gz 2>/dev/null | nl -w2 -s"  " | while read -r N F; do
+    BASE="$(basename "$F")"
+    DATE="$(echo "$BASE" | sed -n 's/^snapshot_\([0-9-]\+_[0-9-]\+\).*/\1/p')"
+    LABEL="$(echo "$BASE" | sed -n 's/^snapshot_[0-9-]\+_[0-9-]\+_\(.*\)\.tar\.gz/\1/p')"
+    printf "%2s | %-19s | %-28s | %s\n" "$N" "${DATE:-?}" "${LABEL:-?}" "$BASE"
+  done
 fi
