@@ -170,9 +170,10 @@ export default function Diagnostics() {
 
       await SpeechRecognition.start({
         language: 'it-IT',
-        partialResults: true,
+        partialResults: false,
         popup: true,       // forziamo il popup nativo
         maxResults: 5,
+        continuous: false,
       });
       log('Speech.start OK');
       console.log('[speech] start called');
