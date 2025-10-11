@@ -61,29 +61,46 @@ export default function Diagnostics() {
 
   // ===== carica cordova_plugins.js e il JS del plugin speech se non presenti
   async function ensureCordovaPluginSpeech(){
+  try{
+    if (typeof window==='undefined' || !window.cordova){ return 'no-cordova'; }
+    // 1) carica registry se non presente
+    let gotList = false;
     try {
-      if (typeof window==='undefined') return;
-      if (!(window.cordova && window.cordova.plugins)) {
-        try {
-          await loadScript('cordova_plugins.js');
-          log('cordova_plugins.js caricato');
-        } catch(e) {
-          log('ERR caricando cordova_plugins.js: '+(e?.message||e));
-        }
+      if (!(window.cordova && window.cordova.require && window.cordova.require('cordova/plugin_list'))) {
+        await loadScript('cordova_plugins.js');
       }
-      const hasSpeechObj = !!(window.plugins && window.plugins.speechRecognition);
-      if (!hasSpeechObj){
-        try {
-          await loadScript('plugins/cordova-plugin-speechrecognition/www/SpeechRecognition.js');
-          log('plugins/.../SpeechRecognition.js caricato');
-        } catch(e) {
-          log('ERR caricando SpeechRecognition.js: '+(e?.message||e));
-        }
-      }
-    } catch(e) {
-      log('ensureCordovaPluginSpeech ERR: '+(e?.message||e));
+      const pl = window.cordova && window.cordova.require ? window.cordova.require('cordova/plugin_list') : null;
+      if (pl) { gotList = true; window.__pluginList = pl; }
+    } catch(e){ /* ignore, loggeremo sotto */ }
+
+    if (!gotList){
+      return 'no-plugin-list';
     }
+    // 2) prendi gli items: array con {id, file, clobbers, ...}
+    const list = (window.__pluginList && (window.__pluginList || window.__pluginList.moduleList || window.__pluginList.plugins)) || window.__pluginList;
+    const items = Array.isArray(list) ? list : (list && list.moduleList ? list.moduleList : []);
+    if (!items || !items.length){ return 'empty-list'; }
+
+    // 3) carica SOLO i moduli del pacchetto speech e raccogli path reali
+    const targets = items.filter(it => String(it.id||'').indexOf('cordova-plugin-speechrecognition') !== -1);
+    if (!targets.length){ return 'speech-not-in-list'; }
+
+    let loaded = [];
+    for (const it of targets){
+      if (!it.file) continue;
+      try{
+        await loadScript(it.file); // es: plugins/cordova-plugin-speechrecognition/www/SpeechRecognition.js
+        loaded.push(it.file);
+      }catch(e){
+        return 'load-fail:'+it.file;
+      }
+    }
+    return loaded.length ? 'ok' : 'nothing-loaded';
+  }catch(e){
+    return 'err:'+ (e && e.message ? e.message : String(e));
   }
+}
+
 
   // ===== clobber manuale in window.plugins / cordova.plugins
   async function forceCordovaClobbers(){
@@ -150,6 +167,11 @@ export default function Diagnostics() {
 
       // (manuale) i plugin Cordova si possono caricare dal bottone dedicato.
 
+      // carica lista e moduli plugin via registry
+      const ens = await ensureCordovaPluginSpeech();
+      log('ensureCordovaPluginSpeech: '+ens);
+      const cl = await forceCordovaClobbers?.();
+      if (cl) log('Cordova clobber speech: '+cl);
       // rilettura stato
       log('Post-deviceready cordovaState: ' + JSON.stringify(cordovaState()));
       if (hasCordovaSpeech()) log('Cordova driver: disponibile (post-inject)');
@@ -400,6 +422,7 @@ export default function Diagnostics() {
 
       <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button onClick={injectCordovaJs}>Carica cordova.js e attendi deviceready</button>
+<button onClick={()=>{ try{ const pl = window.cordova && window.cordova.require && window.cordova.require('cordova/plugin_list'); log('plugin_list keys: '+Object.keys(pl||{}).join(',')); log('plugin_list raw: '+JSON.stringify(pl).slice(0,400)+'...'); }catch(e){ log('no plugin_list: '+(e?.message||e)); } }}>Stampa plugin_list</button>
 <button onClick={async()=>{ await ensureCordovaPluginSpeech(); log('try ensure plugins → '+JSON.stringify(cordovaState())); }}>Carica plugin Cordova (registry)</button>
 <button onClick={async()=>{ const cl = await forceCordovaClobbers(); log('clobber manuale: '+cl+' → '+JSON.stringify(cordovaState())); }}>Clobber manuale Speech</button>
 
