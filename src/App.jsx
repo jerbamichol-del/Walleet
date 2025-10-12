@@ -1,3 +1,6 @@
 import React from 'react';
-import Diagnostics from '@/pages/Diagnostics';
-export default function App() { return <Diagnostics />; }
+import Home from './pages/Home.jsx';
+
+export default function App(){
+  return <Home/>;
+}
