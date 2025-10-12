@@ -18,7 +18,8 @@ export default function Home() {
   }, []);
 
   return (
-    <div style={{marginBottom:12}}><BiometricButton/></div>
+    <>
+<div style={{marginBottom:12}}><BiometricButton/></div>
     <div style={{ padding: 16 }}>
       <h1 style={{ marginBottom: 8 }}>Walleet</h1>
       <div style={{ marginBottom: 16, fontSize: 16 }}>
@@ -37,6 +38,7 @@ export default function Home() {
       </div>
       <p style={{ color:'#666', marginTop: 12 }}>Grafico: somma giornaliera delle spese.</p>
     </div>
-  );
+  
+</>);
 }
 
