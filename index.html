@@ -4,9 +4,38 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Walleet</title>
+    <style>
+      #errOverlay{position:fixed;inset:0;background:#0b1020;color:#e2e8f0;font:14px/1.4 system-ui, sans-serif;display:none;z-index:999999;padding:12px;overflow:auto}
+      #errOverlay pre{white-space:pre-wrap;word-break:break-word}
+      #errOverlay .title{font-weight:700;margin-bottom:8px}
+      #errOverlay .small{opacity:.7;font-size:12px}
+    </style>
+    <script>
+      (function(){
+        const box = document.createElement('div'); box.id='errOverlay';
+        box.innerHTML = '<div class="title">⚠️ Errore runtime</div><pre id="errText"></pre><div class="small">Tocca per chiudere</div>';
+        box.onclick = ()=>{ box.style.display='none'; };
+        document.addEventListener('DOMContentLoaded', ()=>document.body.appendChild(box));
+        function show(msg){
+          try{
+            const t = document.getElementById('errText'); if(!t) return;
+            t.textContent = (t.textContent? t.textContent+'\n' : '') + msg;
+            document.getElementById('errOverlay').style.display='block';
+          }catch(_){}
+        }
+        window.addEventListener('error', e=>{
+          show('[onerror] '+ (e?.message||e) + (e?.filename?(' @ '+e.filename+':'+e.lineno+':'+e.colno):''));
+        });
+        window.addEventListener('unhandledrejection', e=>{
+          const r = e?.reason;
+          show('[unhandled] '+ (r?.message||r));
+        });
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <!-- Vite sostituirà questo src in build con /assets/index-*.js -->
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
