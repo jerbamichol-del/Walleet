@@ -1,7 +1,7 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Walleet (DIAG)</string>
-    <string name="title_activity_main">Walleet (DIAG)</string>
+    <string name="app_name">Walleet</string>
+    <string name="title_activity_main">Walleet</string>
     <string name="package_name">com.example.gestorespese</string>
     <string name="custom_url_scheme">com.example.gestorespese</string>
 </resources>

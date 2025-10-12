@@ -12,7 +12,7 @@ ARCH="$SNAP/snapshot_${TS}_${LABEL_SAFE}.tar.gz"
 LOG="$SNAP/status_${TS}_${LABEL_SAFE}.log"
 
 {
-  echo "Snapshot: $(basename "$ARCH")"
+  echo "Snapshot: $ARCH"
   echo "Date: $TS"
   echo "Label: $LABEL"
   echo
@@ -25,10 +25,16 @@ LOG="$SNAP/status_${TS}_${LABEL_SAFE}.log"
   git -C "$ROOT" status 2>/dev/null || echo "no git"
 } | tee "$LOG"
 
-tar --exclude="./_snapshots" --exclude="./.git" --exclude="./node_modules" \
-    --exclude="./android/.gradle" --exclude="./android/app/build" \
-    --exclude="./.gradle" --exclude="./.npm" --exclude="./_apk" \
-    -czf "$ARCH" .
+tar \
+  --exclude="./_snapshots" \
+  --exclude="./.git" \
+  --exclude="./node_modules" \
+  --exclude="./android/.gradle" \
+  --exclude="./android/app/build" \
+  --exclude="./.gradle" \
+  --exclude="./.npm" \
+  --exclude="./_apk" \
+  -czf "$ARCH" .
 
 echo -e "$TS\t$(basename "$ARCH")\t$LABEL" >> "$SNAP/index.tsv"
 

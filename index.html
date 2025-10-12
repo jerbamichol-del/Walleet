@@ -7,24 +7,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script>
-      (function(){
-        function show(msg){
-          try{
-            var box=document.getElementById("__errbox");
-            if(!box){
-              box=document.createElement("pre");
-              box.id="__errbox";
-              box.style.cssText="position:fixed;left:8px;right:8px;bottom:8px;top:8px;overflow:auto;background:#111;color:#f88;padding:12px;border:1px solid #f44;z-index:999999;font-family:monospace;white-space:pre-wrap";
-              document.body.appendChild(box);
-            }
-            box.textContent=(box.textContent?box.textContent+"\n\n":"")+msg;
-          }catch(e){}
-        }
-        window.addEventListener("error", function(e){ var info="onerror: "+(e.message||e.error||"unknown"); if(e.filename){ info+="\nfile: "+e.filename+"\nline: "+e.lineno+":"+e.colno; } if(e.error&&e.error.stack){ info+="\nstack: "+e.error.stack; } show("onerror: "+(e.message||e.error||"unknown")); });
-        window.addEventListener("unhandledrejection", function(e){ show("unhandledrejection: "+(e.reason&&e.reason.message?e.reason.message:JSON.stringify(e.reason))); });
-      })();
-    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

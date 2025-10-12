@@ -1,56 +1,61 @@
-import React, { useState } from 'react';
-import { addExpense } from '../db';
+import React, { useRef, useState } from 'react';
+import { voiceMode } from '@/config';
+import { startSpeech, stopSpeech } from '@/services/speech';
 
-const CATS = ['Spesa', 'Trasporti', 'Ristorante', 'Casa', 'Svago', 'Altro'];
-
-export default function AddExpense({ onSaved }) {
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0,10));
-  const [category, setCategory] = useState('Altro');
+export default function AddExpense(){
+  const [desc, setDesc] = useState('');
   const [amount, setAmount] = useState('');
-  const [note, setNote] = useState('');
-  const [busy, setBusy] = useState(false);
-  const canSave = date && amount;
+  const descRef = useRef(null);
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    if (!canSave) return;
-    setBusy(true);
-    try {
-      await addExpense({ date, category, amount: Number(amount), note });
-      setAmount('');
-      setNote('');
-      onSaved?.();
-    } finally {
-      setBusy(false);
+  async function handleMic(){
+    if (voiceMode === 'plugin'){
+      try {
+        await startSpeech({ lang:'it-IT', popup:true, onResult:(t)=>setDesc(t), onError:(e)=>console.log('speech err', e), logger:console.log });
+      } catch(e){ console.log('startSpeech failed', e); }
+    } else {
+      // keyboard mode (default): metti a fuoco l'input → l'utente usa 🎤 della tastiera
+      try { descRef.current?.focus(); } catch(_) {}
     }
+  }
+  async function handleStop(){
+    if (voiceMode === 'plugin') await stopSpeech(console.log);
   }
 
   return (
-    <form onSubmit={handleSubmit} style={{ display:'grid', gap: 12, padding: 16 }}>
-      <label>
-        Data<br/>
-        <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={inputStyle}/>
-      </label>
-      <label>
-        Categoria<br/>
-        <select value={category} onChange={e=>setCategory(e.target.value)} style={inputStyle}>
-          {CATS.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-      </label>
-      <label>
-        Importo (€)<br/>
-        <input type="number" step="0.01" inputMode="decimal" value={amount} onChange={e=>setAmount(e.target.value)} style={inputStyle}/>
-      </label>
-      <label>
-        Nota (opzionale)<br/>
-        <input type="text" value={note} onChange={e=>setNote(e.target.value)} style={inputStyle}/>
-      </label>
-      <button type="submit" disabled={!canSave || busy} style={btnStyle}>
-        {busy ? 'Salvataggio...' : 'Salva'}
-      </button>
-    </form>
+    <div style={{padding:16}}>
+      <h2>Aggiungi spesa</h2>
+
+      <label>Descrizione</label>
+      <div style={{display:'flex', gap:8, alignItems:'center', marginBottom:12}}>
+        <input
+          ref={descRef}
+          value={desc}
+          onChange={(e)=>setDesc(e.target.value)}
+          placeholder="Es: Caffè bar"
+          style={{flex:1, padding:'10px 12px', border:'1px solid #ccc', borderRadius:8}}
+        />
+        <button onClick={handleMic} title={voiceMode==='plugin'?'Detta con Google (popup)':'Usa 🎤 della tastiera'}>
+          🎤
+        </button>
+        {voiceMode==='plugin' && <button onClick={handleStop} title="Stop riconoscimento">⏹️</button>}
+      </div>
+
+      <small style={{opacity:0.75,display:'block',marginBottom:12}}>
+        {voiceMode==='plugin'
+          ? 'Se il popup non restituisce testo, chiudi il popup: l\'app forza lo stop per flush dei risultati.'
+          : 'Suggerimento: tocca 🎤 sulla tastiera (Gboard) per dettare direttamente in questo campo.'}
+      </small>
+
+      <label>Importo</label>
+      <input
+        value={amount}
+        onChange={(e)=>setAmount(e.target.value)}
+        placeholder="Es: 1.20"
+        inputMode="decimal"
+        style={{display:'block', width:'100%', padding:'10px 12px', border:'1px solid #ccc', borderRadius:8, marginTop:8}}
+      />
+
+      {/* Qui i tuoi bottoni di salvataggio originali */}
+    </div>
   );
 }
-
-const inputStyle = { width:'100%', padding:'10px 12px', border:'1px solid #ccc', borderRadius:10 };
-const btnStyle = { padding:'10px 14px', borderRadius:10, border:'1px solid #333', background:'#f5f5f5' };
